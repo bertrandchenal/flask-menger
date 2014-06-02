@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{config.APP_NAME|capitalize}}</title>
+    <link href="{{url_for('menger.static', filename='css/libs.css')}}" rel="stylesheet">
+    <link href="{{url_for('menger.static', filename='css/custom.css')}}" rel="stylesheet">
+    <script src="{{url_for('menger.static', filename='js/libs.js')}}"></script>
+    <script src="{{url_for('menger.static', filename='js/custom.js')}}"></script>
+
+  </head>
+  <body>
+
+
+    <div class="container">
+      <div class="row">
+        <div class="col-md-9 col-sm-9">
+          <h3>{{config.APP_NAME|capitalize}}</h3>
+        </div>
+
+        <div class="col-md-3 col-sm-3">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-3 col-sm-3 left-menu">
+          <h4>Measures</h4>
+          <div class="panel-group" id="measures"
+               data-bind="template: {name: 'measure_tpl', foreach: measures}">
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-default"
+                    data-bind="click: push_measure">
+              <span class="glyphicon glyphicon-plus"></span>
+            </button>
+          </div>
+
+          <h4>Dimensions</h4>
+
+          <div class="panel-group" id="dimensions"
+               data-bind="template: {name: 'dimension_tpl', foreach: dimensions}">
+          </div>
+          <div class="btn-group">
+            <button type="button" class="btn btn-default"
+                    data-bind="click: push_dimension">
+              <span class="glyphicon glyphicon-plus"></span>
+            </button>
+          </div>
+
+          <hr>
+          <h4>Export</h4>
+          <a type="button" class="btn btn-default"
+             href="#" title="Dowload Excel file"
+             data-bind="click: get_xlsx">
+            Excel <span class="glyphicon glyphicon-download"></span>
+          </a>
+        </div>
+
+        <div class="col-md-9 col-sm-9">
+          <table class="table table-hover table-bordered">
+            <thead>
+              <tr data-bind="foreach: columns">
+                <th data-bind="text: label"></th>
+              </tr>
+            </thead>
+            <tbody data-bind="foreach: {data: data, as: 'line'}">
+              <tr data-bind="foreach: $parent.columns">
+                <td data-bind="text: line[$index()], css: type"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div> <!-- /.row -->
+    </div> <!-- /.container -->
+
+
+    <script type="text/html" id="measure_tpl">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h4 class="panel-title">
+            <a data-toggle="collapse" data-parent="#measures"
+               data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
+            </a>
+            <span data-bind="if: $index() > 0">
+              <a class="glyphicon glyphicon-remove pull-right"
+                 data-bind="click: $parent.remove_measure.bind($parent, $index())">
+              </a>
+            </span>
+          </h4>
+        </div>
+        <div class="panel-collapse collapse"
+             data-bind="attr: {id: 'collapse-measure-' + $index()}">
+          <div class="panel-body">
+            <div class="list-group" data-bind="foreach: $root.available_measures">
+              <li class="list-group-item" data-bind="css: {active: $data === $parent}">
+                <a href="#"
+                   data-bind="text: fullname,
+                              click: $root.select_measure.bind(
+                              $root, $data, $parentContext.$index())">
+                </a>
+              </li>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+
+    <script type="text/html" id="dimension_tpl">
+      <div class="panel panel-default">
+        <div class="panel-heading">
+          <h4 class="panel-title">
+            <span data-bind="if: selected()">
+              <a class="glyphicon glyphicon-chevron-left"
+                 data-bind="click: drill_up"></a>
+            </span>
+            <a data-toggle="collapse" data-parent="#dimensions"
+               data-bind="attr: {href: '#collapse-dimension-' + $index()},
+                          text: label">
+            </a>
+            <span data-bind="if: $index() > 0">
+              <a class="glyphicon glyphicon-remove pull-right"
+                 data-bind="click: remove">
+              </a>
+            </span>
+          </h4>
+        </div>
+        <div class="panel-collapse collapse"
+             data-bind="attr: {id: 'collapse-dimension-' + $index()}">
+          <div class="panel-body">
+            <ul class="list-group" data-bind="foreach: choice">
+              <li class="list-group-item  clearfix" data-bind="css: {active: active()}">
+                <a href="#"
+                   data-bind="text: fullname,
+                              click: activate">
+                </a>
+                <div data-bind="if: has_children()" class="pull-right">
+                  <a href="#" class="glyphicon glyphicon-chevron-right"
+                     data-bind="click: drill">
+                  </a>
+              </li>
+            </ul>
+            </div>
+          </div>
+        </div>
+
+    </script>
+
+  </body>
+</html>
