@@ -214,7 +214,7 @@ DimSelect.prototype.get_value = function() {
             return actives[0].value;
         }
         var val = sel.value.slice();
-        val.push(null)
+        val.push(null);
         return val;
     }
     return [null];
