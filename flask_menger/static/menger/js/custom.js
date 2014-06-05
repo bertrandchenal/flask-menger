@@ -40,9 +40,10 @@ var Dimension = function(name, label, depth, kw) {
     }
 };
 
-Dimension.prototype.drill = function() {
+Dimension.prototype.drill = function(value) {
+    // TODO add cache
     var query = {
-        'space': this.dim_select().dataset.measures()[0].space.name, // TODO pass all spaces
+        'space': this.dim_select().dataset.measures()[0].space.name,
         'dimension': this.name,
         'value': this.value,
     }
@@ -50,11 +51,13 @@ Dimension.prototype.drill = function() {
     query = JSON.stringify(query);
     var url = '/mng/drill.json?' + $.param({'query': query});
 
-    $.ajax(url).success(function(res) {
+    var prm = $.ajax(url)
+    prm.success(function(res) {
         this.add_children(res.data);
         this.activate();
         this.dim_select().selected(this);
     }.bind(this));
+    return prm;
 };
 
 Dimension.prototype.add_children = function(names) {
@@ -81,6 +84,38 @@ Dimension.prototype.clone = function(kw) {
         kw);
 };
 
+Dimension.prototype.set_value = function(value) {
+    if (!value || !value.length) {
+        return;
+    }
+
+    var prm = this.drill();
+    if (!value[0]) {
+        prm.success(function() {
+            this.dim_select().selected(this);
+        }.bind(this));
+        return prm;
+    }
+
+    var chained_prm = prm.then(function() {
+        for (var pos in this.children) {
+            var child = this.children[pos];
+            var last_val = child.value[child.value.length - 1];
+            if (last_val != value[0]) {
+                continue;
+            }
+            value = value.splice(1);
+            if (value.length) {
+                return child.set_value(value);
+            }
+            child.activate();
+            break;
+        }
+    }.bind(this));
+
+    return chained_prm;
+};
+
 Dimension.prototype.activate = function() {
     if (!this.parent) {
         this.dim_select().root(this);
@@ -100,13 +135,15 @@ Dimension.prototype.has_children = function() {
     return this.value.length < this.depth;
 };
 
-var DimSelect = function(dataset) {
+var DimSelect = function(dataset, dim_name, dim_value) {
     this.dataset = dataset;
     this.selected = ko.observable();
     this.root = ko.observable();
-
     this.available = ko.observable();
-    this.set_available(dataset.available_dimensions());
+    this.prm = this.set_available(
+        dataset.available_dimensions(),
+        dim_name,
+        dim_value);
 
     this.choice = ko.computed(function() {
         var selected = this.selected();
@@ -137,14 +174,34 @@ DimSelect.prototype.remove = function() {
     }
 };
 
-DimSelect.prototype.set_available = function(available) {
+DimSelect.prototype.set_available = function(available, dim_name, dim_value) {
     var clones = available.map(function (d) {
         var clone = d.clone({dim_select: this});
         return clone
     }.bind(this));
     this.available(clones);
-    this.root(clones[0]);
-    clones[0].active(true);
+
+    // Search the clone matching dim_name
+    var clone = null;
+    for (var pos in clones) {
+        if (clones[pos].name == dim_name) {
+            clone = clones[pos];
+            break;
+        }
+    }
+
+    // no match on dim_name: pick the first
+    if (!clone) {
+        this.root(clones[0]);
+        clones[0].active(true);
+        return;
+    }
+
+    // update clone with the correct value and return the
+    // corresponding promise
+    this.root(clone);
+    var prm = clone.set_value(dim_value);
+    return prm;
 };
 
 DimSelect.prototype.get_value = function() {
@@ -166,72 +223,28 @@ DimSelect.prototype.get_value = function() {
 var DIM_CACHE = {}
 var DATA_CACHE = {}
 
-var DataSet = function() {
+var DataSet = function(json_state) {
     this.measures =  ko.observableArray([]);
     this.available_measures = ko.observable([]);
     this.dimensions = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
     this.data = ko.observable();
     this.columns = ko.observable([]);
+    this.json_state = ko.observable();
+    this.state = {};
+    this.ready = ko.observable(false);
 
-    // Fetch meta-data
-    $.get('/mng/info.json').success(this.fetch_info.bind(this));
+    // fetch meta-data and init state
+    $.get('/mng/info.json').success(function(info) {
+        this.set_info(info);
+        this.set_state(json_state);
+    }.bind(this));
 
     this.measures.subscribe(this.measures_changed.bind(this));
 
-    // Fetch statistics
-    ko.computed(this.fetch_data.bind(this)).extend({rateLimit: 0});;
+    // compute state
+    ko.computed(this.refresh_state.bind(this));
 };
-
-
-DataSet.prototype.measures_changed = function(measures) {
-    var dimensions = DIM_CACHE[measures[0].space.name] || [];
-    // Copy list to avoid destroying data
-    dimensions = dimensions.slice();
-    // Filter dimensions that are available for all measures
-    for (var pos=1; pos < measures.length; pos++) {
-        var other = DIM_CACHE[measures[pos].space.name]
-        for (var x in dimensions) {
-            var dname = dimensions[x].name;
-            var found = false
-            for (var y in other) {
-                if (dname == other[y].name) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                dimensions.splice(x, 1);
-            }
-        }
-    }
-
-    this.available_dimensions(dimensions);
-
-    // Clean active dimensions
-    var current_dims = this.dimensions();
-    if (!current_dims) {
-        current_dims = [];
-    }
-    var available_names = dimensions.map(function(d) {
-        return d.name;
-    });
-
-    for (var pos in current_dims) {
-        var current_name = current_dims[pos].selected().name;
-        if (available_names.indexOf(current_name) < 0) {
-            current_dims.splice(pos, 1);
-        } else {
-            current_dims[pos].set_available(dimensions);
-        }
-    }
-
-    this.dimensions(current_dims)
-    if (!current_dims.length) {
-        this.push_dimension();
-    }
-};
-
 
 DataSet.prototype.push_dimension = function() {
     this.dimensions.push(new DimSelect(this));
@@ -256,8 +269,7 @@ DataSet.prototype.push_measure = function() {
     this.measures.push(this.available_measures()[0]);
 };
 
-
-DataSet.prototype.fetch_info = function(info) {
+DataSet.prototype.set_info = function(info) {
     for (var space_name in info) {
         var dimensions = [];
         for (var pos in info[space_name]['dimensions']) {
@@ -276,46 +288,157 @@ DataSet.prototype.fetch_info = function(info) {
         }
     }
     this.available_measures(measures);
-    this.measures([measures[0]])
 };
 
-DataSet.prototype.fetch_data = function(mime) {
+DataSet.prototype.get_dim_selects = function(dims) {
+    return dims.map(function(d) {
+        return new DimSelect(this, d[0], d[1]);
+    }.bind(this));
+};
+
+DataSet.prototype.measures_changed = function(measures) {
+    var dimensions = DIM_CACHE[measures[0].space.name] || [];
+    // Copy list to avoid destroying data
+    dimensions = dimensions.slice();
+    // Filter dimensions that are available for all measures
+    for (var pos=1; pos < measures.length; pos++) {
+        var other = DIM_CACHE[measures[pos].space.name]
+        for (var x in dimensions) {
+            var dname = dimensions[x].name;
+            var found = false
+            for (var y in other) {
+                if (dname == other[y].name) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                dimensions.splice(x, 1);
+            }
+        }
+    }
+
+    this.available_dimensions(dimensions);
+    this.refresh_dimensions();
+};
+
+DataSet.prototype.refresh_measures = function() {
+    var measures = [];
+    if (this.state.measures) {
+        measures = this.available_measures().filter(function(m) {
+            return this.state.measures.indexOf(m.name) >= 0;
+        }.bind(this));
+    } else if (this.available_measures().length) {
+         measures = [this.available_measures()[0]];
+    }
+    this.measures(measures);
+};
+
+DataSet.prototype.refresh_dimensions = function() {
+    // Clean active dimensions
+    var current_dims = this.dimensions();
+    if (!current_dims) {
+        current_dims = [];
+    }
+    var available_names = this.available_dimensions().map(function(d) {
+        return d.name;
+    });
+    for (var pos in current_dims) {
+        var current_name = current_dims[pos].root().name;
+        if (available_names.indexOf(current_name) < 0) {
+            current_dims.splice(pos, 1);
+        } else {
+            current_dims[pos].set_available(
+                this.available_dimensions()
+            );
+        }
+    }
+
+    // If dimensions remain, return ..
+    if (current_dims.length) {
+        this.dimensions(current_dims)
+        this.ready(true);
+        return;
+    }
+
+    // .. if not, build them based on current state
+    var state_dimensions = this.state.dimensions || [];
+    state_dimensions = state_dimensions.filter(function(n) {
+        return available_names.indexOf(n[0]) >= 0;
+    });
+    if (state_dimensions.length) {
+        var dimensions = this.get_dim_selects(state_dimensions);
+        // update this.dimension only when all are ready
+        var prms = dimensions.map(function(d) {return d.prm});
+        $.when.apply(this, prms).then(function() {
+            this.dimensions(dimensions);
+            this.ready(true);
+        }.bind(this));
+
+    } else {
+        // Show at least one dimension
+        this.push_dimension();
+        this.ready(true);
+    }
+}
+
+DataSet.prototype.set_state = function(state) {
+    this.ready(false);
+    this.state = state || {};
+    // Reset data
+    this.dimensions([]);
+    this.refresh_measures();
+};
+
+DataSet.prototype.refresh_state = function() {
+    if (!this.ready()) {
+        return;
+    }
+
     var dims = this.dimensions();
     var msrs = this.measures();
     if (!(dims.length && msrs.length)) {
         return;
     }
 
-    var query = {
+    this.state = {
         'measures': msrs.map(function(m) {return m.name}),
         'dimensions': dims.map(function(d) {
             var value = d.get_value();
             return [d.name(), value]
         }),
     }
+    this.json_state(JSON.stringify(this.state));
 
-    query = JSON.stringify(query);
+    var hash = '#' + encodeURIComponent(this.json_state());
+    if (window.location.hash != hash) {
+        window.history.pushState(this.state, "Title", hash);
+    }
+    this.fetch_data();
+};
 
-    // var res = DATA_CACHE[query];
-    // if (res) {
-    //     this.data(res.data);
-    //     return;
-    // }
+DataSet.prototype.fetch_data = function(mime) {
+    var json_state = this.json_state()
+    var res = DATA_CACHE[json_state];
+    if (res) {
+        this.data(res.data);
+        this.columns(res.columns);
+        return;
+    }
 
     // Add empty value to prevent double-trigger of query
-    DATA_CACHE[query] = {'data': []};
+    DATA_CACHE[json_state] = {'data': []};
 
-    var url = '/mng/dice.' + (mime || 'json') + '?' + $.param({'query': query});
+    var url = '/mng/dice.' + (mime || 'json') + '?' +  $.param({'query': json_state});;
     if (mime) {
         window.location.href = url;
 
     } else {
-        $.ajax(url).success(this.set_data.bind(this, query))
+        $.ajax(url).success(this.set_data.bind(this, json_state))
     }
-
 };
 
-DataSet.prototype.set_data = function(query, res) {
+DataSet.prototype.set_data = function(json_state, res) {
     var msr_names = this.measures().map(function(m) {
         return m.name;
     });
@@ -329,7 +452,7 @@ DataSet.prototype.set_data = function(query, res) {
             var c = columns[y];
             var val = line[y];
             if (c.type == 'dimension') {
-                line[y] = val.join('/');
+                line[y] = val;
             } else if (c.type == 'measure') {
                 if (val === undefined) {
                     line[y] = 0;
@@ -343,7 +466,7 @@ DataSet.prototype.set_data = function(query, res) {
     }
 
     // Store in cache
-    DATA_CACHE[query] = res;
+    DATA_CACHE[json_state] = res;
     this.data(res.data);
     this.columns(res.columns);
 };
@@ -353,9 +476,21 @@ DataSet.prototype.get_xlsx = function() {
 };
 
 var init = function() {
-    var ds = new DataSet();
-    ko.applyBindings(ds, $('body')[0]);
+    var json_state;
+    try {
+        json_state = JSON.parse(
+            decodeURIComponent(window.location.hash.slice(1))
+        );
+    } catch (err) {
+        json_state = null;
+    }
 
+    var ds = new DataSet(json_state);
+    window.onpopstate = function(event) {
+        ds.set_state(event.state);
+    }.bind(this);
+
+    ko.applyBindings(ds, $('body')[0]);
 };
 
 $(init);
