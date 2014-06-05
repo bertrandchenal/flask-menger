@@ -452,7 +452,7 @@ DataSet.prototype.set_data = function(json_state, res) {
             var c = columns[y];
             var val = line[y];
             if (c.type == 'dimension') {
-                line[y] = val;
+                line[y] = val.join('/');
             } else if (c.type == 'measure') {
                 if (val === undefined) {
                     line[y] = 0;
