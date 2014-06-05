@@ -420,7 +420,7 @@ DataSet.prototype.refresh_state = function() {
 DataSet.prototype.fetch_data = function(mime) {
     var json_state = this.json_state()
     var res = DATA_CACHE[json_state];
-    if (res) {
+    if (res && !mime) {
         this.data(res.data);
         this.columns(res.columns);
         return;
