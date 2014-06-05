@@ -13,6 +13,12 @@ from menger import Dimension, Measure
 logger = logging.getLogger('menger.flask')
 
 
+def get_label(space, name, value):
+    value = '/'.join(str(v) for v in value[:-1])
+    if not value:
+        return get_dimension(space, name).label
+    return "%s: %s" % (get_dimension(space, name).label, value)
+
 def get_dimension(space, name):
     if not hasattr(space, name):
         raise Exception('Space %s has not attribute %s.' % (space.name, name))
@@ -70,13 +76,15 @@ def dice(dimensions, measures):
     # No pivot, return regular output
     if not pivot_name:
         dim_cols = [{
-            'label': get_dimension(spc, d[0]).label,
+            'label': get_label(spc, d[0], d[1]),
             'type': 'dimension',
         } for d in dimensions]
 
         data_dict = dice_by_msr(dimensions, measures)
         d_drills = [get_dimension(spc, d).glob(v) for d, v in dimensions]
-        data = [list(key) + data_dict[key] for key in product(*d_drills)]
+        # TODO k[-1] is will not work for (2014, None, None)
+        data = [[k[-1] for k in key] + data_dict[key] \
+                for key in product(*d_drills)]
         return data, dim_cols + msr_cols
 
     # split dimensions and get pivot values depth
@@ -127,7 +135,7 @@ def dice(dimensions, measures):
 
     # construct columns metadata
     cols = [{
-        'label': get_dimension(spc, d[0]).label,
+        'label': get_label(spc, d[0], d[1]),
         'type': 'dimension',
     } for d in regular_dims]
 
