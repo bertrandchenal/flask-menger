@@ -1,25 +1,18 @@
 from flask import current_app, Blueprint, render_template, request, json
 
 from flask_menger.web import build_xlsx, dice
-from menger import connect
+from menger import connect, get_space, iter_spaces
 
 menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
-
-SPACES = {}
-
-
-def add_space(name, space):
-    SPACES[name] = space
-
 
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
 def mng(method, ext):
     res = {}
 
     if method == 'info':
-        for name, space in SPACES.items():
+        for name, space in iter_spaces():
             res[name] = {
                 'measures': [{
                     'name': m.name,
@@ -39,7 +32,7 @@ def mng(method, ext):
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
             spc_name = query.get('space')
-            spc = SPACES.get(spc_name)
+            spc = get_space(spc_name)
             if not spc:
                 return ('space "%s" not found' % spc_name, 404)
 

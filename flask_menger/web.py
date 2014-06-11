@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 from flask import send_file
 
 import flask_menger as app
-from menger import Dimension, Measure
+from menger import Dimension, Measure, get_space
 
 
 logger = logging.getLogger('menger.flask')
@@ -47,7 +47,7 @@ def get_measure(space, name):
 def dice(dimensions, measures):
     # Get space
     spc_name = measures[0].split('.')[0]
-    spc = app.SPACES.get(spc_name)
+    spc = get_space(spc_name)
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
@@ -164,7 +164,7 @@ def dice_by_msr(dimensions, measures):
     data = defaultdict(lambda: [0 for _ in measures])
     key_len = len(dimensions)
     for pos, (spc_name, msrs) in enumerate(spc_msr):
-        spc = app.SPACES.get(spc_name)
+        spc = get_space(spc_name)
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
