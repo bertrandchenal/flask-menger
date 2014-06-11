@@ -243,7 +243,9 @@ var DataSet = function(json_state) {
     this.measures.subscribe(this.measures_changed.bind(this));
 
     // compute state
-    ko.computed(this.refresh_state.bind(this));
+    ko.computed(this.refresh_state.bind(this)).extend({
+        'rateLimit': 10,
+    });
 };
 
 DataSet.prototype.push_dimension = function() {
