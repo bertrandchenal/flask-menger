@@ -1,4 +1,5 @@
 from flask import current_app, Blueprint, render_template, request, json
+from flask.ext.login import login_required
 
 from flask_menger.web import build_xlsx, dice
 from menger import connect, get_space, iter_spaces
@@ -8,6 +9,7 @@ menger_app = Blueprint('menger', __name__,
                        static_folder='static/menger')
 
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
+@login_required
 def mng(method, ext):
     res = {}
 
@@ -74,6 +76,7 @@ def mng(method, ext):
 
 
 @menger_app.route('/')
+@login_required
 def home():
     return render_template("index.html")
 
