@@ -1,6 +1,6 @@
 "use strict"
 
-var to_money = function(Amount) {
+var to_money = function(Amount, Symbol) {
     var DecimalSeparator = Number("1.2").toLocaleString().substr(1,1);
 
     var AmountWithCommas = Amount.toLocaleString();
@@ -9,7 +9,7 @@ var to_money = function(Amount) {
     var decPart = (arParts.length > 1 ? arParts[1] : '');
     decPart = (decPart + '00').substr(0,2);
 
-    return intPart + DecimalSeparator + decPart + ' €';
+    return intPart + DecimalSeparator + decPart + ' ' + Symbol;
 }
 
 var Space = function(name, label) {
@@ -459,8 +459,13 @@ DataSet.prototype.set_data = function(json_state, res) {
                 if (val === undefined) {
                     line[y] = 0;
                 } else if (val.toFixed) {
-                    if (c.name == 'amount') {
-                        line[y] = to_money(val);
+                    if (c.name.indexOf("amount") > -1) {
+                    	if (c.name.indexOf("_eur") > -1) {
+                    		var symbol = "€";
+                    	} else {
+                    		var symbol = "";
+                    	}
+                    	line[y] = to_money(val, symbol);
                     }
                 }
             }

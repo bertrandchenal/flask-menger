@@ -7,6 +7,7 @@ menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
 
+
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
 def mng(method, ext):
     res = {}

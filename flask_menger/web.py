@@ -184,7 +184,8 @@ def build_xlsx(res):
     wb = openpyxl.Workbook(optimized_write=True)
     sheet = wb.create_sheet(title='Results')
     sheet.append([c['label'] for c in columns])
-    money_style = Style(number_format=NumberFormat(u"#,##0.00 \u20AC"))
+    euro_style = Style(number_format=NumberFormat(u"#,##0.00 \u20AC"))
+    money_style = Style(number_format=NumberFormat(u"#,##0.00"))
 
     for line in res['data']:
         line = list(line)
@@ -193,8 +194,11 @@ def build_xlsx(res):
                 line[pos] = '/'.join(str(i) for i in line[pos])
             elif col['type'] == 'measure':
                 cell = {'value': line[pos]}
-                if col['name'] == 'amount':
-                    cell['style'] = money_style
+                if 'amount' in col['name']:
+                    if '_eur' in col['name']:
+                        cell['style'] = euro_style
+                    else:
+                        cell['style'] = money_style
                 line[pos] = cell
         sheet.append(line)
 
