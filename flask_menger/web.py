@@ -33,7 +33,6 @@ def get_dimension(space, name):
 def get_measure(name, field):
     space_name, name = name.split('.')
     space = get_space(space_name)
-    print(space._name)
     if not hasattr(space, name):
         raise Exception('Space %s has not attribute %s.' % (space._name, name))
     msr = getattr(space, name)
