@@ -30,18 +30,22 @@ def get_dimension(space, name):
     return dim
 
 
-def get_measure(space, name):
-    if '.' in name:
-        _, name = name.split('.')
-
+def get_measure(name, field):
+    space_name, name = name.split('.')
+    space = get_space(space_name)
+    print(space._name)
     if not hasattr(space, name):
-        raise Exception('Space %s has not attribute %s.' % (space.name, name))
+        raise Exception('Space %s has not attribute %s.' % (space._name, name))
     msr = getattr(space, name)
     if not isinstance(msr, Measure):
         raise Exception('%s is not a measure on space  %s.' % (
-            space.name, name))
+            space._name, name))
 
-    return msr
+    if field == 'name':
+        return msr.name
+    elif field == 'label':
+        return space._label + '/' + msr.label
+    return '?'
 
 
 def dice(dimensions, measures):
@@ -68,9 +72,9 @@ def dice(dimensions, measures):
         regular_names.remove(pivot_name)
 
     msr_cols = [{
-        'label': spc._label + ' / ' + get_measure(spc, m).label,
+        'label': get_measure(m, 'label'),
         'type': 'measure',
-        'name': get_measure(spc, m).name,
+        'name': get_measure(m, 'name'),
     } for m in measures]
 
     # No pivot, return regular output
