@@ -309,12 +309,12 @@ DataSet.prototype.measures_changed = function(measures) {
     dimensions = dimensions.slice();
     // Filter dimensions that are available for all measures
     for (var pos=1; pos < measures.length; pos++) {
-        var other = DIM_CACHE[measures[pos].space.name]
+        var others = DIM_CACHE[measures[pos].space.name]
         for (var x in dimensions) {
-            var dname = dimensions[x].name;
+            var dim = dimensions[x];
             var found = false
-            for (var y in other) {
-                if (dname == other[y].name) {
+            for (var y in others) {
+                if (dim.name == others[y].name) {
                     found = true;
                     break;
                 }
