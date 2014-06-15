@@ -30,7 +30,7 @@ var Dimension = function(name, label, depth, kw) {
     this.label = label;
     this.value = kw.value || [];
     this.parent = kw.parent;
-    this.depth = depth;
+    this.depth = ko.observable(depth);
     this.dim_select = ko.observable(kw.dim_select);
     this.active = ko.observable(false);
     this.children = [];
@@ -38,6 +38,11 @@ var Dimension = function(name, label, depth, kw) {
     if (this.value.length) {
         this.fullname = this.value[this.value.length-1];
     }
+    this.depth.subscribe(function(depth) {
+        this.children.forEach(function(child) {
+            child.depth(depth);
+        });
+    }.bind(this));
 };
 
 Dimension.prototype.drill = function(value) {
@@ -80,7 +85,7 @@ Dimension.prototype.clone = function(kw) {
     return new Dimension(
         this.name,
         this.label,
-        this.depth,
+        this.depth(),
         kw);
 };
 
@@ -132,7 +137,7 @@ Dimension.prototype.activate = function() {
 };
 
 Dimension.prototype.has_children = function() {
-    return this.value.length < this.depth;
+    return this.value.length < this.depth();
 };
 
 var DimSelect = function(dataset, dim_name, dim_value) {
@@ -342,17 +347,23 @@ DataSet.prototype.refresh_dimensions = function() {
     if (!current_dims) {
         current_dims = [];
     }
-    var available_names = this.available_dimensions().map(function(d) {
-        return d.name;
+
+    var availables = {};
+    this.available_dimensions().forEach(function(d) {
+        availables[d.name] = d;
     });
+
     for (var pos in current_dims) {
-        var current_name = current_dims[pos].root().name;
-        if (available_names.indexOf(current_name) < 0) {
+        var current_select = current_dims[pos];
+        var current_dim = current_select.root();
+        var av_dim = availables[current_dim.name];
+        if (!av_dim) {
             current_dims.splice(pos, 1);
         } else {
-            current_dims[pos].set_available(
+            current_select.set_available(
                 this.available_dimensions()
             );
+            current_dim.depth(av_dim.depth());
         }
     }
 
@@ -366,7 +377,7 @@ DataSet.prototype.refresh_dimensions = function() {
     // .. if not, build them based on current state
     var state_dimensions = this.state.dimensions || [];
     state_dimensions = state_dimensions.filter(function(n) {
-        return available_names.indexOf(n[0]) >= 0;
+        return n[0] in availables;
     });
     if (state_dimensions.length) {
         var dimensions = this.get_dim_selects(state_dimensions);
