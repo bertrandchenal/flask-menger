@@ -361,7 +361,8 @@ DataSet.prototype.refresh_dimensions = function() {
             current_dims.splice(pos, 1);
         } else {
             current_select.set_available(
-                this.available_dimensions()
+                this.available_dimensions(),
+                current_dim.name
             );
             current_dim.depth(av_dim.depth());
         }
