@@ -84,7 +84,7 @@
             <a data-toggle="collapse" data-parent="#measures"
                data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
             </a>
-            <span data-bind="if: $index() > 0">
+            <span data-bind="if: $index() > 0" class="clearfix">
               <a class="glyphicon glyphicon-remove pull-right"
                  data-bind="click: $parent.remove_measure.bind($parent, $index())">
               </a>
@@ -131,7 +131,7 @@
              data-bind="attr: {id: 'collapse-dimension-' + $index()}">
           <div class="panel-body">
             <ul class="list-group" data-bind="foreach: choice">
-              <li class="list-group-item  clearfix" data-bind="css: {active: active()}">
+              <li class="list-group-item clearfix" data-bind="css: {active: active()}">
                 <a href="#"
                    data-bind="text: fullname,
                               click: activate">
