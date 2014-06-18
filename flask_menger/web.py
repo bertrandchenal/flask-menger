@@ -171,11 +171,18 @@ def dice_by_msr(dimensions, measures):
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
-        for line in spc.dice(dimensions, (m[1] for m in msrs)):
+        filters = get_filters()
+        for line in spc.dice(dimensions, (m[1] for m in msrs), filters):
             key, vals = line[:key_len], line[key_len:]
             for vpos, val in enumerate(vals):
                 data[key][pos + vpos] = val
     return data
+
+
+def get_filters():
+    # TODO shouldn't be here
+    # example: return {'date': (2014, 1, 2)}
+    return {}
 
 
 def build_xlsx(res):
