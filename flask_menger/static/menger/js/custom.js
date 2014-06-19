@@ -538,9 +538,6 @@ DataSet.prototype.set_data = function(json_state, res) {
     var msr_names = this.measures().map(function(m) {
         return m.name;
     });
-    // var dim_names = this.dim_selects().map(function(dsel) {
-    //     return d.selected_dim().name();
-    // });
     var columns = res.columns;
     for (var x in res.data) {
         var line = res.data[x];
