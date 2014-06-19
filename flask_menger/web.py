@@ -84,10 +84,8 @@ def dice(dimensions, measures):
         } for d in dimensions]
 
         data_dict = dice_by_msr(dimensions, measures)
-        d_drills = [get_dimension(spc, d).glob(v) for d, v in dimensions]
-        # TODO k[-1] is will not work for (2014, None, None)
-        data = [[k[-1:] for k in key] + data_dict[key] \
-                for key in product(*d_drills)]
+        d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in dimensions]
+        data = [list(key) + data_dict[key] for key in product(*d_drills)]
         return data, dim_cols + msr_cols
 
     # split dimensions and get pivot values depth

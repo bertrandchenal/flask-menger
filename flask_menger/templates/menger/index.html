@@ -16,21 +16,26 @@
 
     <div class="container">
       <div class="row">
-        <div class="col-md-9 col-sm-9">
+        <div class="col-md-8 col-sm-8">
           <h3>{{config.APP_NAME|capitalize}}</h3>
         </div>
 
-        <div class="col-md-3 col-sm-3">
+        <div class="col-md-4 col-sm-4">
         </div>
       </div>
 
       <div class="row">
-        <div class="col-md-3 col-sm-3 left-menu">
+        <div class="col-md-4 col-sm-4 left-menu">
           <h4>Measures</h4>
           <div class="panel-group" id="measures"
                data-bind="template: {name: 'measure_tpl', foreach: measures}">
           </div>
           <div class="btn-group">
+            <button type="button" class="btn btn-default"
+                    data-bind="click: pop_measure,
+                               attr:{disabled: measures().length <= 1}">
+              <span class="glyphicon glyphicon-minus"></span>
+            </button>
             <button type="button" class="btn btn-default"
                     data-bind="click: push_measure">
               <span class="glyphicon glyphicon-plus"></span>
@@ -40,11 +45,16 @@
           <h4>Dimensions</h4>
 
           <div class="panel-group" id="dimensions"
-               data-bind="template: {name: 'dimension_tpl', foreach: dimensions}">
+               data-bind="template: {name: 'dimension_tpl', foreach: dim_selects}">
           </div>
           <div class="btn-group">
             <button type="button" class="btn btn-default"
-                    data-bind="click: push_dimension">
+                    data-bind="click: pop_dim_select,
+                               attr:{disabled: dim_selects().length <= 1}">
+              <span class="glyphicon glyphicon-minus"></span>
+            </button>
+            <button type="button" class="btn btn-default"
+                    data-bind="click: push_dim_select">
               <span class="glyphicon glyphicon-plus"></span>
             </button>
           </div>
@@ -58,7 +68,7 @@
           </a>
         </div>
 
-        <div class="col-md-9 col-sm-9">
+        <div class="col-md-8 col-sm-8">
           <table class="table table-hover table-bordered">
             <thead>
               <tr data-bind="foreach: columns">
@@ -84,11 +94,6 @@
             <a data-toggle="collapse" data-parent="#measures"
                data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
             </a>
-            <span data-bind="if: $index() > 0" class="clearfix">
-              <a class="glyphicon glyphicon-remove pull-right"
-                 data-bind="click: $parent.remove_measure.bind($parent, $index())">
-              </a>
-            </span>
           </h4>
         </div>
         <div class="panel-collapse collapse"
@@ -109,10 +114,10 @@
     </script>
 
     <script type="text/html" id="dimension_tpl">
-      <div class="panel panel-default">
+      <div class="panel panel-default"  style="overflow: visible">
         <div class="panel-heading">
           <h4 class="panel-title">
-            <span data-bind="if: selected()">
+            <span data-bind="if: can_drill_up()">
               <a class="glyphicon glyphicon-chevron-left"
                  data-bind="click: drill_up"></a>
             </span>
@@ -120,31 +125,63 @@
                data-bind="attr: {href: '#collapse-dimension-' + $index()},
                           text: label">
             </a>
-            <span data-bind="if: $index() > 0">
-              <a class="glyphicon glyphicon-remove pull-right"
-                 data-bind="click: remove">
-              </a>
-            </span>
+            <a class="glyphicon pull-right" data-bind="click: toggle_options">&#9776;
+            </a>
           </h4>
         </div>
         <div class="panel-collapse collapse"
              data-bind="attr: {id: 'collapse-dimension-' + $index()}">
+
           <div class="panel-body">
-            <ul class="list-group" data-bind="foreach: choice">
-              <li class="list-group-item clearfix" data-bind="css: {active: active()}">
-                <a href="#"
-                   data-bind="text: fullname,
-                              click: activate">
-                </a>
-                <div data-bind="if: has_children()" class="pull-right">
-                  <a href="#" class="glyphicon glyphicon-chevron-right"
-                     data-bind="click: drill">
+            <div data-bind="if:show_options()">
+              <div class="well">
+                <h5>Show:</h5>
+
+                <div class="btn-group">
+                  <!-- ko foreach: head_levels -->
+                  <button type="button" class="btn btn-default"
+                          data-bind="css: {active: active}, text: name, click: activate">
+                  </button>
+                  <!-- /ko -->
+                  <!-- ko if: tail_levels().length -->
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-default dropdown-toggle"
+                            data-toggle="dropdown">
+                      <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu"
+                        data-bind="foreach: tail_levels">
+                      <li data-bind="css: {active: active}">
+                        <a href="#" data-bind="text: name, click: activate">
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                  <!-- /ko -->
+                </div>
+
+              </div>
+            </div> <!-- /options -->
+
+            <div data-bind="if:!show_options()">
+              <ul class="list-group" data-bind="foreach:choice">
+                <li class="list-group-item clearfix" data-bind="css: {active: active()}">
+                  <a href="#"
+                     data-bind="text: label,
+                                click: activate">
                   </a>
-              </li>
-            </ul>
-            </div>
+                  <div data-bind="if: has_children()" class="pull-right">
+                    <a href="#" class="glyphicon glyphicon-chevron-right"
+                       data-bind="click: drill">
+                    </a>
+                  </div>
+                </li>
+              </ul>
+            </div> <!-- /dimension children -->
+
           </div>
         </div>
+      </div>
 
     </script>
 

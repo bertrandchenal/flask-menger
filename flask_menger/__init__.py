@@ -24,7 +24,7 @@ def mng(method, ext):
                 'dimensions': [{
                     'name': d.name,
                     'label': d.label,
-                    'depth': d.depth
+                    'levels': d.levels,
                 } for d in space._dimensions],
                 'label': space._label,
             }

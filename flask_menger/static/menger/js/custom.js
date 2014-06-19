@@ -1,5 +1,10 @@
 "use strict"
 
+var DIM_CACHE = {}
+var DATA_CACHE = {}
+var DRILL_CACHE = {}
+
+
 var to_money = function(Amount, Symbol) {
     var DecimalSeparator = Number("1.2").toLocaleString().substr(1,1);
 
@@ -12,10 +17,12 @@ var to_money = function(Amount, Symbol) {
     return intPart + DecimalSeparator + decPart + ' ' + Symbol;
 }
 
+
 var Space = function(name, label) {
     this.name = name;
     this.label = label;
 };
+
 
 var Measure = function(space, name, label) {
     this.space = space;
@@ -24,72 +31,75 @@ var Measure = function(space, name, label) {
     this.fullname = this.space.label +' / ' + this.label;
 };
 
-var Dimension = function(name, label, depth, kw) {
-    kw = kw || {};
-    this.name = name;
-    this.label = label;
-    this.value = kw.value || [];
-    this.parent = kw.parent;
-    this.depth = ko.observable(depth);
-    this.dim_select = ko.observable(kw.dim_select);
+
+var Coordinate = function(dimension, parent, value) {
+    this.value = value;
+    this.parent = parent;
+    this.dimension = dimension;
     this.active = ko.observable(false);
     this.children = [];
-    this.fullname = label;
+    this.label = dimension.label;
     if (this.value.length) {
-        this.fullname = this.value[this.value.length-1];
+        this.label = this.value[this.value.length-1];
     }
-    this.depth.subscribe(function(depth) {
-        this.children.forEach(function(child) {
-            child.depth(depth);
-        });
-    }.bind(this));
 };
 
-Dimension.prototype.drill = function(value) {
-    // TODO add cache
+Coordinate.prototype.drill = function(value) {
     var query = {
-        'space': this.dim_select().dataset.measures()[0].space.name,
-        'dimension': this.name,
+        'space': this.dimension.dimsel.dataset.measures()[0].space.name,
+        'dimension': this.dimension.name,
         'value': this.value,
     }
 
     query = JSON.stringify(query);
-    var url = '/mng/drill.json?' + $.param({'query': query});
+    var callback = function(res) {
+        this.add_children(res.data);
+        this.dimension.selected_coord(this);
+    }.bind(this)
 
+    if (query in DRILL_CACHE) {
+        callback(DRILL_CACHE[query])
+        return;
+    }
+
+    var url = '/mng/drill.json?' + $.param({'query': query});
     var prm = $.ajax(url)
     prm.success(function(res) {
-        this.add_children(res.data);
-        this.activate();
-        this.dim_select().selected(this);
-    }.bind(this));
+        DRILL_CACHE[query] = res;
+        callback(res);
+    });
     return prm;
 };
 
-Dimension.prototype.add_children = function(names) {
+Coordinate.prototype.add_children = function(names) {
     var children = [];
     for (var pos in names) {
         var name = names[pos];
         var value = this.value.slice();
         value.push(name);
-        var child = this.clone({
-            'value': value,
-            'parent': this,
-            'dim_select': this.dim_select(),
-        });
+        var child = new Coordinate(this.dimension, this, value);
         children.push(child);
     }
     this.children = children;
 };
 
-Dimension.prototype.clone = function(kw) {
-    return new Dimension(
-        this.name,
-        this.label,
-        this.depth(),
-        kw);
+Coordinate.prototype.activate = function() {
+    if (this.active()) {
+        this.active(false);
+        return;
+    }
+
+    this.dimension.choice().forEach(function(d) {
+        d.active(false);
+    }.bind(this))
+    this.active(true);
 };
 
-Dimension.prototype.set_value = function(value) {
+Coordinate.prototype.has_children = function() {
+    return this.value.length < this.dimension.levels().length;
+};
+
+Coordinate.prototype.set_value = function(value) {
     if (!value || !value.length) {
         return;
     }
@@ -97,7 +107,7 @@ Dimension.prototype.set_value = function(value) {
     var prm = this.drill();
     if (!value[0]) {
         prm.success(function() {
-            this.dim_select().selected(this);
+            this.dimension.selected_coord(this);
         }.bind(this));
         return prm;
     }
@@ -117,74 +127,132 @@ Dimension.prototype.set_value = function(value) {
             break;
         }
     }.bind(this));
-
     return chained_prm;
 };
 
-Dimension.prototype.activate = function() {
-    if (!this.parent) {
-        this.dim_select().root(this);
-    };
-    if (this.active()) {
-        this.active(false);
-        return;
-    }
 
-    this.dim_select().choice().forEach(function(d) {
-        d.active(false);
-    }.bind(this))
-    this.active(true);
+var Dimension = function(name, label, levels, dimsel) {
+    this.name = name;
+    this.label = label;
+    this.dimsel = dimsel;
+    this.active = ko.observable(false);
+    this.selected_coord = ko.observable();
+    this.levels = ko.observable(levels);
+};
+
+Dimension.prototype.choice = function() {
+    return this.selected_coord().children;
 };
 
 Dimension.prototype.has_children = function() {
-    return this.value.length < this.depth();
+    return true;
+};
+
+Dimension.prototype.drill = function() {
+    this.activate();
+    var root = new Coordinate(this, null, []);
+    this.selected_coord(root);
+    root.drill();
+};
+
+Dimension.prototype.activate = function() {
+    var old = this.dimsel.selected_dim()
+    old && old.active(false);
+    this.dimsel.selected_dim(this);
+    this.active(true);
+};
+
+Dimension.prototype.drill_up = function() {
+    this.selected_coord(this.selected_coord().parent);
+};
+
+Dimension.prototype.set_value = function(value) {
+    var root = new Coordinate(this, null, []);
+    this.selected_coord(root);
+    root.set_value(value);
+}
+
+Dimension.prototype.get_value = function() {
+    var coord = this.selected_coord();
+    if (coord) {
+        var actives = this.choice().filter(function(d) {
+            return d.active();
+        });
+        if (actives.length) {
+            return actives[0].value;
+        }
+        var val = coord.value.slice();
+        val.push(null);
+        for (var i = val.length; i <= this.dimsel.level_index(); i++) {
+            val.push(null);
+        }
+        return val;
+    }
+    return [null];
 };
 
 var DimSelect = function(dataset, dim_name, dim_value) {
     this.dataset = dataset;
-    this.selected = ko.observable();
-    this.root = ko.observable();
-    this.available = ko.observable();
-    this.prm = this.set_available(
+    this.selected_dim = ko.observable();
+    this.show_options = ko.observable(false);
+    this.dimensions = ko.observable();
+    this.level_index = ko.observable(1);
+    this.head_levels = ko.observable([]);
+    this.tail_levels = ko.observable([]);
+    this.prm = this.set_dimensions(
         dataset.available_dimensions(),
         dim_name,
         dim_value);
 
     this.choice = ko.computed(function() {
-        var selected = this.selected();
-        if (selected){
-            return selected.children;
+        var selected_dim = this.selected_dim();
+        if (selected_dim && selected_dim.selected_coord()){
+            return selected_dim.choice();
         }
-        return this.available();
+        return this.dimensions();
     }.bind(this));
 
     this.label = ko.computed(function() {
-        return this.root().label;
+        var dim = this.selected_dim();
+        return dim ? dim.label : '?';
     }.bind(this));
 
-    this.name = ko.computed(function() {
-        return this.root().name;
+
+    ko.computed(function() {
+        var dim = this.selected_dim();
+        if (!dim) {
+            this.head_levels([]);
+            this.tail_levels([]);
+            return;
+        }
+        var heads = [];
+        var tails = [];
+        var depth = 0;
+        var coord = dim.selected_coord();
+        if (coord) {
+            depth = coord.value.length;
+        }
+
+        dim.levels().slice(depth).forEach(function(name, pos) {
+            var level = new Level(name, depth+pos, this);
+            if (pos < 2) {
+                heads.push(level);
+            } else {
+                tails.push(level);
+            }
+        }.bind(this));
+
+        this.head_levels(heads);
+        this.tail_levels(tails);
     }.bind(this));
-
 };
 
-DimSelect.prototype.drill_up = function() {
-    this.selected(this.selected().parent);
-};
-
-DimSelect.prototype.remove = function() {
-    var idx = this.dataset.dimensions.indexOf(this);
-    if (idx >= 0) {
-        this.dataset.dimensions.splice(idx, 1);
-    }
-};
-
-DimSelect.prototype.set_available = function(available, dim_name, dim_value) {
+DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
     var clones = available.map(function (d) {
-        var clone = d.clone({dim_select: this});
+        var clone = new Dimension(d.name, d.label, d.levels(), this);
         return clone
     }.bind(this));
-    this.available(clones);
+    this.dimensions(clones);
 
     // Search the clone matching dim_name
     var clone = null;
@@ -197,41 +265,53 @@ DimSelect.prototype.set_available = function(available, dim_name, dim_value) {
 
     // no match on dim_name: pick the first
     if (!clone) {
-        this.root(clones[0]);
-        clones[0].active(true);
+        clones[0].activate();
         return;
     }
 
     // update clone with the correct value and return the
     // corresponding promise
-    this.root(clone);
+    clone.activate();
     var prm = clone.set_value(dim_value);
     return prm;
 };
 
-DimSelect.prototype.get_value = function() {
-    var sel = this.selected();
-    if (sel) {
-        var actives = this.choice().filter(function(d) {
-            return d.active();
-        });
-        if (actives.length) {
-            return actives[0].value;
-        }
-        var val = sel.value.slice();
-        val.push(null);
-        return val;
-    }
-    return [null];
+DimSelect.prototype.toggle_options = function(dim_select, ev) {
+    this.show_options(!this.show_options());
 };
 
-var DIM_CACHE = {}
-var DATA_CACHE = {}
+DimSelect.prototype.drill_up = function() {
+    this.selected_dim().drill_up();
+    this.show_options(false);
+};
+
+DimSelect.prototype.can_drill_up = function() {
+    return this.selected_dim().selected_coord();
+};
+
+
+var Level = function(name, index, dimsel) {
+    this.name = name;
+    this.index = index;
+    this.dimsel = dimsel;
+
+    if (dimsel.level_index() == index) {
+        this.active = true;
+    } else {
+        this.active = false;
+    }
+};
+
+Level.prototype.activate = function() {
+    this.active = true;
+    this.dimsel.level_index(this.index);
+};
+
 
 var DataSet = function(json_state) {
     this.measures =  ko.observableArray([]);
     this.available_measures = ko.observable([]);
-    this.dimensions = ko.observableArray([]);
+    this.dim_selects = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
     this.data = ko.observable();
     this.columns = ko.observable([]);
@@ -253,8 +333,10 @@ var DataSet = function(json_state) {
     });
 };
 
-DataSet.prototype.push_dimension = function() {
-    this.dimensions.push(new DimSelect(this));
+DataSet.prototype.push_dim_select = function() {
+    var dsel = new DimSelect(this);
+    this.dim_selects.push(dsel);
+    return dsel;
 };
 
 DataSet.prototype.select_measure = function(selected, pos) {
@@ -267,13 +349,12 @@ DataSet.prototype.push_measure = function() {
     this.measures.push(this.available_measures()[0]);
 };
 
-DataSet.prototype.remove_measure = function(pos) {
-    this.measures.splice(pos);
+DataSet.prototype.pop_measure = function() {
+    this.measures.pop();
 };
 
-
-DataSet.prototype.push_measure = function() {
-    this.measures.push(this.available_measures()[0]);
+DataSet.prototype.pop_dim_select = function() {
+    this.dim_selects.pop()
 };
 
 DataSet.prototype.set_info = function(info) {
@@ -281,7 +362,7 @@ DataSet.prototype.set_info = function(info) {
         var dimensions = [];
         for (var pos in info[space_name]['dimensions']) {
             var dim = info[space_name]['dimensions'][pos];
-            dimensions.push(new Dimension(dim.name, dim.label, dim.depth));
+            dimensions.push(new Dimension(dim.name, dim.label, dim.levels));
         }
         DIM_CACHE[space_name] = dimensions;
     }
@@ -343,9 +424,9 @@ DataSet.prototype.refresh_measures = function() {
 
 DataSet.prototype.refresh_dimensions = function() {
     // Clean active dimensions
-    var current_dims = this.dimensions();
-    if (!current_dims) {
-        current_dims = [];
+    var current_selects = this.dim_selects();
+    if (!current_selects) {
+        current_selects = [];
     }
 
     var availables = {};
@@ -353,24 +434,24 @@ DataSet.prototype.refresh_dimensions = function() {
         availables[d.name] = d;
     });
 
-    for (var pos in current_dims) {
-        var current_select = current_dims[pos];
-        var current_dim = current_select.root();
+    for (var pos in current_selects) {
+        var current_select = current_selects[pos];
+        var current_dim = current_select.selected_dim();
         var av_dim = availables[current_dim.name];
         if (!av_dim) {
-            current_dims.splice(pos, 1);
+            current_selects.splice(pos, 1);
         } else {
-            current_select.set_available(
+            current_select.set_dimensions(
                 this.available_dimensions(),
                 current_dim.name
             );
-            current_dim.depth(av_dim.depth());
+            current_dim.levels(av_dim.levels());
         }
     }
 
     // If dimensions remain, return ..
-    if (current_dims.length) {
-        this.dimensions(current_dims)
+    if (current_selects.length) {
+        this.dim_selects(current_selects)
         this.ready(true);
         return;
     }
@@ -381,17 +462,17 @@ DataSet.prototype.refresh_dimensions = function() {
         return n[0] in availables;
     });
     if (state_dimensions.length) {
-        var dimensions = this.get_dim_selects(state_dimensions);
-        // update this.dimension only when all are ready
-        var prms = dimensions.map(function(d) {return d.prm});
+        var dim_selects = this.get_dim_selects(state_dimensions);
+        // update this.dim_selects only when all are ready
+        var prms = dim_selects.map(function(d) {return d.prm});
         $.when.apply(this, prms).then(function() {
-            this.dimensions(dimensions);
+            this.dim_selects(dim_selects);
             this.ready(true);
         }.bind(this));
 
     } else {
         // Show at least one dimension
-        this.push_dimension();
+        this.push_dim_select();
         this.ready(true);
     }
 }
@@ -400,7 +481,7 @@ DataSet.prototype.set_state = function(state) {
     this.ready(false);
     this.state = state || {};
     // Reset data
-    this.dimensions([]);
+    this.dim_selects([]);
     this.refresh_measures();
 };
 
@@ -409,17 +490,18 @@ DataSet.prototype.refresh_state = function() {
         return;
     }
 
-    var dims = this.dimensions();
+    var dim_sels = this.dim_selects();
     var msrs = this.measures();
-    if (!(dims.length && msrs.length)) {
+    if (!(dim_sels.length && msrs.length)) {
         return;
     }
 
     this.state = {
         'measures': msrs.map(function(m) {return m.name}),
-        'dimensions': dims.map(function(d) {
-            var value = d.get_value();
-            return [d.name(), value]
+        'dimensions': dim_sels.map(function(dsel) {
+            var dimension = dsel.selected_dim();
+            var value = dimension.get_value();
+            return [dimension.name, value]
         }),
     }
     this.json_state(JSON.stringify(this.state));
@@ -456,9 +538,9 @@ DataSet.prototype.set_data = function(json_state, res) {
     var msr_names = this.measures().map(function(m) {
         return m.name;
     });
-    var dim_names = this.dimensions().map(function(d) {
-        return d.name();
-    });
+    // var dim_names = this.dim_selects().map(function(dsel) {
+    //     return d.selected_dim().name();
+    // });
     var columns = res.columns;
     for (var x in res.data) {
         var line = res.data[x];
@@ -493,6 +575,7 @@ DataSet.prototype.set_data = function(json_state, res) {
 DataSet.prototype.get_xlsx = function() {
     this.fetch_data('xlsx');
 };
+
 
 var init = function() {
     var json_state;
