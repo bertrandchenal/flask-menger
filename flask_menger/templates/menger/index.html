@@ -125,40 +125,40 @@
                data-bind="attr: {href: '#collapse-dimension-' + $index()},
                           text: label">
             </a>
-            <a class="glyphicon pull-right" data-bind="click: toggle_options">&#9776;
+            <a class="glyphicon pull-right"
+               data-bind="click: toggle_options, css: {active: show_options}">
+              &#9776;
             </a>
           </h4>
         </div>
         <div class="panel-collapse collapse"
-             data-bind="attr: {id: 'collapse-dimension-' + $index()}">
-
+             data-bind="attr: {id: 'collapse-dimension-' + $index()},
+                        css: {option: show_options}">
           <div class="panel-body">
             <div data-bind="if:show_options()">
-              <div class="well">
-                <h5>Show:</h5>
+              <h5>Show:</h5>
 
+              <div class="btn-group">
+                <!-- ko foreach: head_levels -->
+                <button type="button" class="btn btn-default"
+                        data-bind="css: {active: active}, text: name, click: activate">
+                </button>
+                <!-- /ko -->
+                <!-- ko if: tail_levels().length -->
                 <div class="btn-group">
-                  <!-- ko foreach: head_levels -->
-                  <button type="button" class="btn btn-default"
-                          data-bind="css: {active: active}, text: name, click: activate">
+                  <button type="button" class="btn btn-default dropdown-toggle"
+                          data-toggle="dropdown">
+                    <span class="caret"></span>
                   </button>
-                  <!-- /ko -->
-                  <!-- ko if: tail_levels().length -->
-                  <div class="btn-group">
-                    <button type="button" class="btn btn-default dropdown-toggle"
-                            data-toggle="dropdown">
-                      <span class="caret"></span>
-                    </button>
-                    <ul class="dropdown-menu"
-                        data-bind="foreach: tail_levels">
-                      <li data-bind="css: {active: active}">
-                        <a href="#" data-bind="text: name, click: activate">
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
-                  <!-- /ko -->
+                  <ul class="dropdown-menu"
+                      data-bind="foreach: tail_levels">
+                    <li data-bind="css: {active: active}">
+                      <a href="#" data-bind="text: name, click: activate">
+                      </a>
+                    </li>
+                  </ul>
                 </div>
+                <!-- /ko -->
 
               </div>
             </div> <!-- /options -->
