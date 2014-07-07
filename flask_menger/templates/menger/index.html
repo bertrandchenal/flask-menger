@@ -1,29 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "layout.html" %}
+
+    {% block title %}
     <title>{{config.APP_NAME|capitalize}}</title>
+    {% endblock %}
+
+    {% block head %}
     <link href="{{url_for('menger.static', filename='css/libs.css')}}" rel="stylesheet">
     <link href="{{url_for('menger.static', filename='css/custom.css')}}" rel="stylesheet">
     <script src="{{url_for('menger.static', filename='js/libs.js')}}"></script>
     <script src="{{url_for('menger.static', filename='js/custom.js')}}"></script>
+    {% endblock %}
 
-  </head>
-  <body>
-
-
-    <div class="container">
-      <div class="row">
-        <div class="col-md-8 col-sm-8">
-          <h3>{{config.APP_NAME|capitalize}}</h3>
-        </div>
-
-        <div class="col-md-4 col-sm-4">
-        </div>
-      </div>
-
+    {% block container %}
       <div class="row">
         <div class="col-md-4 col-sm-4 left-menu">
           <h4>Measures</h4>
@@ -84,9 +72,9 @@
         </div>
 
       </div> <!-- /.row -->
-    </div> <!-- /.container -->
+    {% endblock %}
 
-
+    {% block postscripts %}
     <script type="text/html" id="measure_tpl">
       <div class="panel panel-default">
         <div class="panel-heading">
@@ -185,6 +173,4 @@
       </div>
 
     </script>
-
-  </body>
-</html>
+    {% endblock %}
