@@ -126,7 +126,8 @@
                           text: label">
             </a>
             <a class="glyphicon pull-right"
-               data-bind="click: toggle_options, css: {active: show_options}">
+               data-bind="click: toggle_options, css: {active: show_options},
+                          if: selected_dim().selected_coord()">
               &#9776;
             </a>
           </h4>
