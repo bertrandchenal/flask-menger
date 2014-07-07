@@ -152,7 +152,7 @@ def dice(dimensions, measures):
 
     pivot_dim = get_dimension(spc, pivot_name)
     cols.append({
-        'label': pivot_dim.levels[(depth - 1)],
+        'label': pivot_dim.levels[depth - 1],
         'type': 'dimension',
     })
     for head in pivot_heads:
