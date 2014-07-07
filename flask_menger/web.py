@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import groupby, product
+from itertools import groupby, product, takewhile
 import logging
 import os
 from tempfile import mkdtemp
@@ -11,13 +11,15 @@ from menger import Dimension, Measure, get_space
 
 
 logger = logging.getLogger('menger.flask')
+not_none = lambda x: x is not None
 
 
 def get_label(space, name, value):
-    value = '/'.join(str(v) for v in value[:-1])
+    value = '/'.join(str(v) for v in filter(not_none, value))
     if not value:
         return get_dimension(space, name).label
     return "%s: %s" % (get_dimension(space, name).label, value)
+
 
 def get_dimension(space, name):
     if not hasattr(space, name):
@@ -26,8 +28,14 @@ def get_dimension(space, name):
     if not isinstance(dim, Dimension):
         raise Exception('%s is not a dimension on space  %s.' % (
             space.name, name))
-
     return dim
+
+
+def get_head(values):
+    """
+    Return a tuple of the first non-None items in values list
+    """
+    return tuple(takewhile(not_none, values))
 
 
 def get_measure(name, field):
@@ -110,12 +118,14 @@ def dice(dimensions, measures):
         datas.append(dice_by_msr(regular_dims + [d], measures))
 
     r_drills = [get_dimension(spc, d).glob(v) for d, v in regular_dims]
-    pivot_heads = [v[:-1] for d, v in pivot_dims]
+    pivot_heads = []
     pivot_tails = set()
     for d, v in pivot_dims:
+        head = get_head(v)
+        pivot_heads.append(head)
+        cut = len(head)
         for child in get_dimension(spc, d).glob(v):
-            # TODO replace -1 by len(tail) aka number of trailing None
-            pivot_tails.add(child[-1:])
+            pivot_tails.add(child[cut:])
 
     pivot_tails = sorted(pivot_tails)
     merged_data = []
