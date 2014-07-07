@@ -59,12 +59,12 @@ Coordinate.prototype.drill = function(value) {
 
     if (query in DRILL_CACHE) {
         callback(DRILL_CACHE[query])
-        return;
+        return $.when();
     }
 
     var url = '/mng/drill.json?' + $.param({'query': query});
     var prm = $.ajax(url)
-    prm.success(function(res) {
+    prm.then(function(res) {
         DRILL_CACHE[query] = res;
         callback(res);
     });
@@ -106,7 +106,7 @@ Coordinate.prototype.set_value = function(value) {
 
     var prm = this.drill();
     if (!value[0]) {
-        prm.success(function() {
+        prm.then(function() {
             this.dimension.selected_coord(this);
         }.bind(this));
         return prm;
@@ -320,7 +320,7 @@ var DataSet = function(json_state) {
     this.ready = ko.observable(false);
 
     // fetch meta-data and init state
-    $.get('/mng/info.json').success(function(info) {
+    $.get('/mng/info.json').then(function(info) {
         this.set_info(info);
         this.set_state(json_state);
     }.bind(this));
@@ -530,7 +530,7 @@ DataSet.prototype.fetch_data = function(mime) {
         window.location.href = url;
 
     } else {
-        $.ajax(url).success(this.set_data.bind(this, json_state))
+        $.ajax(url).then(this.set_data.bind(this, json_state))
     }
 };
 
