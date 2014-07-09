@@ -15,10 +15,11 @@ not_none = lambda x: x is not None
 
 
 def get_label(space, name, value):
-    value = '/'.join(str(v) for v in filter(not_none, value))
+    value = filter(not_none, value)
+    dim = get_dimension(space, name)
     if not value:
-        return get_dimension(space, name).label
-    return "%s: %s" % (get_dimension(space, name).label, value)
+        return dim.label
+    return "%s: %s" % (dim.label, dim.format(value))
 
 
 def get_dimension(space, name):
@@ -38,7 +39,7 @@ def get_head(values):
     return tuple(takewhile(not_none, values))
 
 
-def get_measure(name, field):
+def get_measure(name):
     space_name, name = name.split('.')
     space = get_space(space_name)
     if not hasattr(space, name):
@@ -48,14 +49,10 @@ def get_measure(name, field):
         raise Exception('%s is not a measure on space  %s.' % (
             space._name, name))
 
-    if field == 'name':
-        return msr.name
-    elif field == 'label':
-        return space._label + '/' + msr.label
-    return '?'
+    return msr
 
 
-def dice(dimensions, measures):
+def dice(coordinates, measures, format_type=None):
     # Get space
     spc_name = measures[0].split('.')[0]
     spc = get_space(spc_name)
@@ -65,7 +62,7 @@ def dice(dimensions, measures):
     # Search for a pivot
     pivot_name = None
     regular_names = []
-    for name, _ in dimensions:
+    for name, _ in coordinates:
         if name in regular_names:
             if pivot_name and pivot_name != name:
                 # Double pivot not supported
@@ -79,9 +76,9 @@ def dice(dimensions, measures):
         regular_names.remove(pivot_name)
 
     msr_cols = [{
-        'label': get_measure(m, 'label'),
+        'label': spc._label + '/' + get_measure(m).label,
         'type': 'measure',
-        'name': get_measure(m, 'name'),
+        'name': get_measure(m).name,
     } for m in measures]
 
     # No pivot, return regular output
@@ -89,78 +86,104 @@ def dice(dimensions, measures):
         dim_cols = [{
             'label': get_label(spc, d[0], d[1]),
             'type': 'dimension',
-        } for d in dimensions]
+        } for d in coordinates]
 
-        data_dict = dice_by_msr(dimensions, measures)
-        d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in dimensions]
-        data = [list(key) + data_dict[key] for key in product(*d_drills)]
+        data_dict = dice_by_msr(coordinates, measures)
+        d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
+        data = []
+        dimensions = [get_dimension(spc, d) for d, v in coordinates]
+        measures = [get_measure(m) for m in measures]
+
+        for key in product(*d_drills):
+            line = [d.format(v, type=format_type) \
+                    for d, v in zip(dimensions, key)]
+            line.extend(m.format(v, type=format_type) \
+                        for m, v in zip(measures, data_dict[key]))
+            data.append(line)
         return data, dim_cols + msr_cols
 
-    # split dimensions and get pivot values depth
+    pivot_dim = get_dimension(spc, pivot_name)
+    # split coordinates and get pivot values depth
     depth = None
-    pivot_dims = []
-    regular_dims = [d for d in dimensions if d[0] in regular_names]
-    for d in dimensions:
+    pivot_coords = []
+    regular_coords = [d for d in coordinates if d[0] in regular_names]
+    for d in coordinates:
         name, vals = d
         if name != pivot_name:
             continue
         if depth is None:
             depth = len(vals)
         elif len(vals) != depth:
-            # Values len mismatch on pivot dimensions
+            # Values len mismatch on pivot coordinates
             continue
-        pivot_dims.append(d)
+        pivot_coords.append(d)
 
     # Query db for each member of pivot
     datas = []
-    for d in pivot_dims:
+    for c in pivot_coords:
         data = {}
-        datas.append(dice_by_msr(regular_dims + [d], measures))
+        datas.append(dice_by_msr(regular_coords + [c], measures))
 
-    r_drills = [get_dimension(spc, d).glob(v) for d, v in regular_dims]
+    r_drills = [get_dimension(spc, d).glob(v) for d, v in regular_coords]
     pivot_heads = []
     pivot_tails = set()
-    for d, v in pivot_dims:
+    for c, v in pivot_coords:
         head = get_head(v)
         pivot_heads.append(head)
         cut = len(head)
-        for child in get_dimension(spc, d).glob(v):
+        for child in get_dimension(spc, c).glob(v):
             pivot_tails.add(child[cut:])
 
     pivot_tails = sorted(pivot_tails)
     merged_data = []
 
+    # Prepare dim & measures list for formating
+    reg_dims = [get_dimension(spc, c) for c, v in regular_coords]
+    measures = [get_measure(m) for m in measures]
+
     for base_key in product(*r_drills):
         for tail in pivot_tails:
-            # Fill line with regular dimensions + pivot base
-            line = list(base_key) + [tail]
+            # Fill line with regular coordinates
+            line = [d.format(k, type=format_type) \
+                    for d, k in zip(reg_dims, base_key)]
+
             # Extend line for each pivot tails
             for pos, head in enumerate(pivot_heads):
+
+                # Add dim value in pivot col
+                if pos == 0:
+                    line.append(
+                        pivot_dim.format(head + tail, type=format_type,
+                                         offset=len(head))
+                    )
+
                 key = base_key + (head + tail,)
                 vals = datas[pos][key]
                 if vals is None:
                     continue
-                line.extend(vals)
+                # Add measure values
+                line.extend(m.format(v, type=format_type) \
+                            for m,v in zip(measures, vals))
 
+            # Format line
             merged_data.append(line)
 
-    # construct columns metadata
+    # Construct columns metadata
     cols = [{
         'label': get_label(spc, d[0], d[1]),
         'type': 'dimension',
-    } for d in regular_dims]
+    } for d in regular_coords]
 
-    pivot_dim = get_dimension(spc, pivot_name)
     cols.append({
         'label': pivot_dim.levels[depth - 1],
         'type': 'dimension',
     })
     for head in pivot_heads:
-        head = '/'.join(str(h) for h in head)
-        if head:
-            head += ' - '
+        prefix = pivot_dim.format(head, type=format_type)
+        if prefix:
+            prefix += ' - '
         cols.extend({
-            'label': head + m['label'],
+            'label': prefix + m['label'],
             'type': 'measure',
             'name': m['name'],
         } for m in msr_cols)
@@ -168,19 +191,20 @@ def dice(dimensions, measures):
     return merged_data, cols
 
 
-def dice_by_msr(dimensions, measures):
+def dice_by_msr(coordinates, measures):
+    # Create one group of measures per space
     spc_msr = groupby((m.split('.') for m in measures),
                      lambda x: x[0])
 
     data = defaultdict(lambda: [0 for _ in measures])
-    key_len = len(dimensions)
+    key_len = len(coordinates)
     for pos, (spc_name, msrs) in enumerate(spc_msr):
         spc = get_space(spc_name)
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
         filters = get_filters()
-        for line in spc.dice(dimensions, (m[1] for m in msrs), filters):
+        for line in spc.dice(coordinates, (m[1] for m in msrs), filters):
             key, vals = line[:key_len], line[key_len:]
             for vpos, val in enumerate(vals):
                 data[key][pos + vpos] = val
@@ -195,29 +219,13 @@ def get_filters():
 
 def build_xlsx(res):
     import openpyxl
-    from openpyxl.styles.numbers import NumberFormat
-    from openpyxl.styles import Style
 
     columns = res['columns']
     wb = openpyxl.Workbook(optimized_write=True)
     sheet = wb.create_sheet(title='Results')
     sheet.append([c['label'] for c in columns])
-    euro_style = Style(number_format=NumberFormat(u"#,##0.00 \u20AC"))
-    money_style = Style(number_format=NumberFormat(u"#,##0.00"))
 
     for line in res['data']:
-        line = list(line)
-        for pos, col in enumerate(columns):
-            if col['type'] == 'dimension':
-                line[pos] = '/'.join(str(i) for i in line[pos])
-            elif col['type'] == 'measure':
-                cell = {'value': line[pos]}
-                if 'amount' in col['name']:
-                    if '_eur' in col['name']:
-                        cell['style'] = euro_style
-                    else:
-                        cell['style'] = money_style
-                line[pos] = cell
         sheet.append(line)
 
     out = os.path.join(mkdtemp(), 'result.xlsx')

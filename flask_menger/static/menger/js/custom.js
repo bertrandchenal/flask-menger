@@ -5,19 +5,6 @@ var DATA_CACHE = {}
 var DRILL_CACHE = {}
 
 
-var to_money = function(Amount, Symbol) {
-    var DecimalSeparator = Number("1.2").toLocaleString().substr(1,1);
-
-    var AmountWithCommas = Amount.toLocaleString();
-    var arParts = String(AmountWithCommas).split(DecimalSeparator);
-    var intPart = arParts[0];
-    var decPart = (arParts.length > 1 ? arParts[1] : '');
-    decPart = (decPart + '00').substr(0,2);
-
-    return intPart + DecimalSeparator + decPart + ' ' + Symbol;
-}
-
-
 var Space = function(name, label) {
     this.name = name;
     this.label = label;
@@ -32,16 +19,13 @@ var Measure = function(space, name, label) {
 };
 
 
-var Coordinate = function(dimension, parent, value) {
+var Coordinate = function(dimension, parent, value, label) {
     this.value = value;
     this.parent = parent;
     this.dimension = dimension;
     this.active = ko.observable(false);
     this.children = [];
-    this.label = dimension.label;
-    if (this.value.length) {
-        this.label = this.value[this.value.length-1];
-    }
+    this.label = label || dimension.label;
 };
 
 Coordinate.prototype.drill = function(value) {
@@ -76,8 +60,8 @@ Coordinate.prototype.add_children = function(names) {
     for (var pos in names) {
         var name = names[pos];
         var value = this.value.slice();
-        value.push(name);
-        var child = new Coordinate(this.dimension, this, value);
+        value.push(name[0]);
+        var child = new Coordinate(this.dimension, this, value, name[1]);
         children.push(child);
     }
     this.children = children;
@@ -544,30 +528,6 @@ DataSet.prototype.set_data = function(json_state, res) {
         return m.name;
     });
     var columns = res.columns;
-    for (var x in res.data) {
-        var line = res.data[x];
-        for (var y in columns) {
-            var c = columns[y];
-            var val = line[y];
-            if (c.type == 'dimension') {
-                line[y] = val.join('/');
-            } else if (c.type == 'measure') {
-                if (val === undefined) {
-                    line[y] = 0;
-                } else if (val.toFixed) {
-                    if (c.name.indexOf("amount") > -1) {
-                    	if (c.name.indexOf("_eur") > -1) {
-                    		var symbol = "€";
-                    	} else {
-                    		var symbol = "";
-                    	}
-                    	line[y] = to_money(val, symbol);
-                    }
-                }
-            }
-        }
-    }
-
     // Store in cache
     DATA_CACHE[json_state] = res;
     this.data(res.data);

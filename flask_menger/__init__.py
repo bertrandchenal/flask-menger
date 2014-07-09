@@ -45,12 +45,14 @@ def mng(method, ext):
                         404)
             dim = getattr(spc, name)
             value = tuple(query.get('value', []))
-
             data = list(dim.drill(value))
-            res['data'] = data
+            offset = len(value)
+            mk_label = lambda x: dim.format(value + (x,), offset=offset)
+            res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
         data = None
+        format_type = 'xlsx' if ext == 'xlsx' else None
         with connect(current_app.config['MENGER_DATABASE']):
             dimensions = query.get('dimensions', [])
             for d in dimensions:
@@ -60,7 +62,7 @@ def mng(method, ext):
             if not measures:
                 return ('Key "measures" is empty', 404)
 
-            data, columns = dice(dimensions, measures)
+            data, columns = dice(dimensions, measures, format_type=format_type)
             res['data'] = data
             res['columns'] = columns
 
