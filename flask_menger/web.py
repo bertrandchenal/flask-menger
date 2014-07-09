@@ -2,11 +2,11 @@ from collections import defaultdict
 from itertools import groupby, product, takewhile
 import logging
 import os
+import datetime
 from tempfile import mkdtemp
 
-from flask import send_file
+from flask import send_file, current_app
 
-import flask_menger as app
 from menger import Dimension, Measure, get_space
 
 
@@ -20,6 +20,7 @@ def get_label(space, name, value):
     if not value:
         return dim.label
     return "%s: %s" % (dim.label, dim.format(value))
+
 
 
 def get_dimension(space, name):
@@ -230,4 +231,11 @@ def build_xlsx(res):
 
     out = os.path.join(mkdtemp(), 'result.xlsx')
     wb.save(out)
-    return send_file(out, mimetype="application/vnd.ms-excel")
+    return send_file(out,
+                     as_attachment=True,
+                     attachment_filename=compute_filename(current_app.config['MENGER_EXPORT_PATTERN']))
+
+
+def compute_filename(pattern):
+    now = datetime.datetime.now()
+    return '%s.xlsx' % now.strftime(pattern)
