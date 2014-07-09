@@ -495,7 +495,7 @@ DataSet.prototype.refresh_state = function() {
     }
     this.json_state(JSON.stringify(this.state));
 
-    var hash = '#' + encodeURIComponent(this.json_state());
+    var hash = '#' + btoa(this.json_state());
     if (window.location.hash != hash) {
         window.history.pushState(this.state, "Title", hash);
     }
@@ -543,7 +543,7 @@ var init = function() {
     var json_state;
     try {
         json_state = JSON.parse(
-            decodeURIComponent(window.location.hash.slice(1))
+            atob(window.location.hash.slice(1))
         );
     } catch (err) {
         json_state = null;
