@@ -196,7 +196,7 @@ var DimSelect = function(dataset, dim_name, dim_value) {
     this.selected_dim = ko.observable();
     this.show_options = ko.observable(false);
     this.dimensions = ko.observable();
-    this.level_index = ko.observable(1);
+    this.level_index = ko.observable(0);
     this.head_levels = ko.observable([]);
     this.tail_levels = ko.observable([]);
     this.prm = this.set_dimensions(
@@ -217,7 +217,12 @@ var DimSelect = function(dataset, dim_name, dim_value) {
         return dim ? dim.label : '?';
     }.bind(this));
 
+    // Reset level index if active dimension change
+    this.selected_dim.subscribe(function() {
+        this.level_index(0);
+    }.bind(this));
 
+    // Update Levels
     ko.computed(function() {
         var dim = this.selected_dim();
         if (!dim) {
