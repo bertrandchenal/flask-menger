@@ -40,3 +40,7 @@ td.measure {
 .option {
     background-color: #f5f5f5;
 }
+
+.wait {
+    cursor: wait;
+}

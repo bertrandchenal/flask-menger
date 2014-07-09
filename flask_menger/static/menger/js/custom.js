@@ -4,6 +4,15 @@ var DIM_CACHE = {}
 var DATA_CACHE = {}
 var DRILL_CACHE = {}
 
+// Force waiting cursor when an ajax call is in progress
+$.ajaxSetup({
+    'beforeSend': function(jqXHR, settings) {
+        $('html').addClass('wait');
+    },
+    'complete': function(jqXHR, settings) {
+        $('html').removeClass('wait');
+    }
+});
 
 var Space = function(name, label) {
     this.name = name;
