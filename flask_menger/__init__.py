@@ -13,7 +13,7 @@ menger_app = Blueprint('menger', __name__,
 @login_required
 def mng(method, ext):
     res = {}
-    get_permission = current_app.config.get('GET_PERMISSION')
+    get_permission = current_app.config.get('MENGER_FILTER')
     if get_permission:
         filters = get_permission()
     else:
