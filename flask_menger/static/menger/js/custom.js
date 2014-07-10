@@ -394,9 +394,9 @@ DataSet.prototype.measures_changed = function(measures) {
     var dimensions = DIM_CACHE[measures[0].space.name] || [];
     // Filter dimensions that are available for all measures
     for (var pos=1; pos < measures.length; pos++) {
+        var others = DIM_CACHE[measures[pos].space.name]
         var unfiltered = dimensions.slice();
         dimensions = [];
-        var others = DIM_CACHE[measures[pos].space.name]
         for (var x in unfiltered) {
             var dim = unfiltered[x];
             for (var y in others) {
