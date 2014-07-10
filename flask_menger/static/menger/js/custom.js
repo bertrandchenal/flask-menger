@@ -162,6 +162,13 @@ Dimension.prototype.drill_up = function() {
 Dimension.prototype.set_value = function(value) {
     var root = new Coordinate(this, null, []);
     this.selected_coord(root);
+    // Clean extra item if value is too long (needed when two measures
+    // work on different depths)
+    var tail = value.splice(this.levels().length)
+    if (tail.length) {
+        // value has been cut, show the last level in full
+        value[value.length -1] = null;
+    }
     root.set_value(value);
 }
 
@@ -233,6 +240,7 @@ var DimSelect = function(dataset, dim_name, dim_value) {
 
         dim.levels().slice(depth).forEach(function(name, pos) {
             var level = new Level(name, depth+pos, this);
+            // If more than two levels, put them in dropdown (tail)
             if (pos < 2) {
                 heads.push(level);
             } else {
@@ -384,22 +392,18 @@ DataSet.prototype.get_dim_selects = function(dims) {
 
 DataSet.prototype.measures_changed = function(measures) {
     var dimensions = DIM_CACHE[measures[0].space.name] || [];
-    // Copy list to avoid destroying data
-    dimensions = dimensions.slice();
     // Filter dimensions that are available for all measures
     for (var pos=1; pos < measures.length; pos++) {
+        var unfiltered = dimensions.slice();
+        dimensions = [];
         var others = DIM_CACHE[measures[pos].space.name]
-        for (var x in dimensions) {
-            var dim = dimensions[x];
-            var found = false
+        for (var x in unfiltered) {
+            var dim = unfiltered[x];
             for (var y in others) {
                 if (dim.name == others[y].name) {
-                    found = true;
+                    dimensions.push(dim);
                     break;
                 }
-            }
-            if (!found) {
-                dimensions.splice(x, 1);
             }
         }
     }
@@ -427,6 +431,7 @@ DataSet.prototype.refresh_dimensions = function() {
         current_selects = [];
     }
 
+    // Index dimensions per name
     var availables = {};
     this.available_dimensions().forEach(function(d) {
         availables[d.name] = d;
@@ -441,7 +446,8 @@ DataSet.prototype.refresh_dimensions = function() {
         } else {
             current_select.set_dimensions(
                 this.available_dimensions(),
-                current_dim.name
+                current_dim.name,
+                current_dim.get_value()
             );
             current_dim.levels(av_dim.levels());
         }
