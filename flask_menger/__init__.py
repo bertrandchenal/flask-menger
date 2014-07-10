@@ -13,6 +13,11 @@ menger_app = Blueprint('menger', __name__,
 @login_required
 def mng(method, ext):
     res = {}
+    get_permission = current_app.config.get('GET_PERMISSION')
+    if get_permission:
+        filters = get_permission()
+    else:
+        filters = None
 
     if method == 'info':
         for name, space in iter_spaces():
@@ -62,7 +67,9 @@ def mng(method, ext):
             if not measures:
                 return ('Key "measures" is empty', 404)
 
-            data, columns = dice(dimensions, measures, format_type=format_type)
+            data, columns = dice(dimensions, measures,
+                                 format_type=format_type,
+                                 filters=filters)
             res['data'] = data
             res['columns'] = columns
 
@@ -82,5 +89,3 @@ def mng(method, ext):
 @login_required
 def home():
     return render_template("index.html")
-
-

@@ -53,7 +53,7 @@ def get_measure(name):
     return msr
 
 
-def dice(coordinates, measures, format_type=None):
+def dice(coordinates, measures, format_type=None, filters=None):
     # Get space
     spc_name = measures[0].split('.')[0]
     spc = get_space(spc_name)
@@ -89,7 +89,7 @@ def dice(coordinates, measures, format_type=None):
             'type': 'dimension',
         } for d in coordinates]
 
-        data_dict = dice_by_msr(coordinates, measures)
+        data_dict = dice_by_msr(coordinates, measures, filters=filters)
         d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
         data = []
         dimensions = [get_dimension(spc, d) for d, v in coordinates]
@@ -123,7 +123,9 @@ def dice(coordinates, measures, format_type=None):
     datas = []
     for c in pivot_coords:
         data = {}
-        datas.append(dice_by_msr(regular_coords + [c], measures))
+        datas.append(
+            dice_by_msr(regular_coords + [c], measures, filters=filters)
+        )
 
     r_drills = [get_dimension(spc, d).glob(v) for d, v in regular_coords]
     pivot_heads = []
@@ -192,7 +194,7 @@ def dice(coordinates, measures, format_type=None):
     return merged_data, cols
 
 
-def dice_by_msr(coordinates, measures):
+def dice_by_msr(coordinates, measures, filters=None):
     # Create one group of measures per space
     spc_msr = groupby((m.split('.') for m in measures),
                      lambda x: x[0])
@@ -204,18 +206,12 @@ def dice_by_msr(coordinates, measures):
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
-        filters = get_filters()
+        filters = filters or {}
         for line in spc.dice(coordinates, (m[1] for m in msrs), filters):
             key, vals = line[:key_len], line[key_len:]
             for vpos, val in enumerate(vals):
                 data[key][pos + vpos] = val
     return data
-
-
-def get_filters():
-    # TODO shouldn't be here
-    # example: return {'date': (2014, 1, 2)}
-    return {}
 
 
 def build_xlsx(res):
