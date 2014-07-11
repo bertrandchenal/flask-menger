@@ -269,7 +269,7 @@ DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
         }
     }
 
-    // no match on dim_name: pick the first
+    // No match on dim_name: pick the first
     if (!clone) {
         clones[0].activate();
         return;
@@ -340,7 +340,21 @@ var DataSet = function(json_state) {
 };
 
 DataSet.prototype.push_dim_select = function() {
-    var dsel = new DimSelect(this);
+    var av = this.available_dimensions();
+    var currents = this.dim_selects().map(function(ds) {
+        return ds.selected_dim().name;
+    });
+    var dim_name;
+    var dim_value = [];
+    for (var pos in av) {
+        var name = av[pos].name;
+        if (currents.indexOf(name) < 0) {
+            dim_name = name;
+            break;
+        }
+    }
+
+    var dsel = new DimSelect(this, dim_name, dim_value);
     this.dim_selects.push(dsel);
     return dsel;
 };
@@ -352,7 +366,22 @@ DataSet.prototype.select_measure = function(selected, pos) {
 };
 
 DataSet.prototype.push_measure = function() {
-    this.measures.push(this.available_measures()[0]);
+    var av = this.available_measures();
+    var currents = this.measures().map(function(m) {
+        return m.name;
+    });
+
+    // Search for a measure that is not already selected
+    for (var pos in av) {
+        var name = av[pos].name;
+        if (currents.indexOf(name) < 0) {
+            this.measures.push(av[pos]);
+            return;
+        }
+    }
+
+    // Every measure already selected, pick the first
+    this.measures.push(av[0]);
 };
 
 DataSet.prototype.pop_measure = function() {
