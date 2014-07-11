@@ -76,11 +76,16 @@ def dice(coordinates, measures, format_type=None, filters=None):
     while pivot_name in regular_names:
         regular_names.remove(pivot_name)
 
-    msr_cols = [{
-        'label': spc._label + '/' + get_measure(m).label,
-        'type': 'measure',
-        'name': get_measure(m).name,
-    } for m in measures]
+    msr_cols = []
+    for m in measures:
+        sname = m.split('.')[0]
+        s = get_space(sname)
+        msr = get_measure(m)
+        msr_cols.append({
+            'label': s._label + '/' + msr.label,
+            'type': 'measure',
+            'name': msr.name,
+        })
 
     # No pivot, return regular output
     if not pivot_name:
