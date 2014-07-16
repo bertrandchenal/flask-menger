@@ -179,15 +179,17 @@ Dimension.prototype.get_value = function() {
         var actives = this.choice().filter(function(d) {
             return d.active();
         });
+        var value;
         if (actives.length) {
-            return actives[0].value;
+            value = actives[0].value;
+        } else {
+            value = coord.value.slice();
+            value.push(null);
         }
-        var val = coord.value.slice();
-        val.push(null);
-        for (var i = val.length; i <= this.dimsel.level_index(); i++) {
-            val.push(null);
+        for (var i = value.length; i <= this.dimsel.level_index(); i++) {
+            value.push(null);
         }
-        return val;
+        return value;
     }
     return [null];
 };
