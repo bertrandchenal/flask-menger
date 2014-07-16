@@ -99,6 +99,7 @@ Coordinate.prototype.set_value = function(value) {
 
     var prm = this.drill();
     if (!value[0]) {
+        this.dimension.dimsel.level_index(value.length);
         prm.then(function() {
             this.dimension.selected_coord(this);
         }.bind(this));
