@@ -6,9 +6,9 @@
 
     {% block head %}
     <link href="{{url_for('menger.static', filename='css/libs.css')}}" rel="stylesheet">
-    <link href="{{url_for('menger.static', filename='css/custom.css')}}" rel="stylesheet">
+    <link href="{{url_for('menger.static', filename='css/menger.css')}}" rel="stylesheet">
     <script src="{{url_for('menger.static', filename='js/libs.js')}}"></script>
-    <script src="{{url_for('menger.static', filename='js/custom.js')}}"></script>
+    <script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
     {% endblock %}
 
     {% block container %}
@@ -48,7 +48,7 @@
           </div>
 
           <hr>
-          <h4>Export</h4>
+          <h4>Exports</h4>
           <a type="button" class="btn btn-default"
              href="#" title="Dowload Excel file"
              data-bind="click: get_xlsx">

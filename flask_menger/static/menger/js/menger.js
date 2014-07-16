@@ -541,7 +541,7 @@ DataSet.prototype.refresh_state = function() {
 
     var hash = '#' + btoa(this.json_state());
     if (window.location.hash != hash) {
-        window.history.pushState(this.state, "Title", hash);
+        window.history.pushState(this.json_state(), "Title", hash);
     }
     this.fetch_data();
 };
@@ -582,20 +582,30 @@ DataSet.prototype.get_xlsx = function() {
     this.fetch_data('xlsx');
 };
 
+DataSet.prototype.create_bookmark = function() {
+};
+
+DataSet.prototype.list_bookmarks = function() {
+};
+
+
+var get_state = function() {
+    return JSON.parse(
+        atob(window.location.hash.slice(1))
+    );
+}
 
 var init = function() {
     var json_state;
     try {
-        json_state = JSON.parse(
-            atob(window.location.hash.slice(1))
-        );
+        json_state = get_state();
     } catch (err) {
         json_state = null;
     }
 
     var ds = new DataSet(json_state);
     window.onpopstate = function(event) {
-        ds.set_state(event.state);
+        ds.set_state(get_state());
     }.bind(this);
 
     ko.applyBindings(ds, $('body')[0]);
