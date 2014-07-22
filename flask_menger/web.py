@@ -232,9 +232,10 @@ def build_xlsx(res):
 
     out = os.path.join(mkdtemp(), 'result.xlsx')
     wb.save(out)
-    return send_file(out,
-                     as_attachment=True,
-                     attachment_filename=compute_filename(current_app.config['MENGER_EXPORT_PATTERN']))
+    attachment_filename = compute_filename(
+        current_app.config['MENGER_EXPORT_PATTERN'])
+    return send_file(out, as_attachment=True,
+                     attachment_filename=attachment_filename)
 
 
 def compute_filename(pattern):
