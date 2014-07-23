@@ -92,14 +92,15 @@ Coordinate.prototype.has_children = function() {
     return this.value.length < this.dimension.levels().length;
 };
 
-Coordinate.prototype.set_value = function(value) {
+Coordinate.prototype.set_value = function(value, offset) {
     if (!value || !value.length) {
         return;
     }
+    offset = offset || 0;
 
     var prm = this.drill();
     if (!value[0]) {
-        this.dimension.dimsel.level_index(value.length - 1);
+        this.dimension.dimsel.level_index(value.length + offset - 1);
         prm.then(function() {
             this.dimension.selected_coord(this);
         }.bind(this));
@@ -115,7 +116,7 @@ Coordinate.prototype.set_value = function(value) {
             }
             value = value.splice(1);
             if (value.length) {
-                return child.set_value(value);
+                return child.set_value(value, offset + 1);
             }
             child.activate();
             break;
