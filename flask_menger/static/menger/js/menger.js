@@ -340,6 +340,31 @@ var DataSet = function(json_state) {
     ko.computed(this.refresh_state.bind(this)).extend({
         'rateLimit': 10,
     });
+
+    this.columns_headers = ko.computed(function() {
+        // Collect parent title for all columns
+        var columns = this.columns();
+        var res = [];
+        var name_found = null;
+        for (var pos in columns) {
+            var name = columns[pos].parent;
+            name_found = name_found || (name && name.length);
+            if (res.length > 0 && name == res[res.length-1].name) {
+                res[res.length-1].colspan += 1;
+                continue;
+            }
+            res.push({
+                'name': name, 'colspan': 1
+            });
+        }
+
+        if (!name_found) {
+            // Avoid to display an empty line
+            return []
+        }
+        return res;
+    }.bind(this));
+
 };
 
 DataSet.prototype.push_dim_select = function() {
@@ -594,7 +619,7 @@ DataSet.prototype.list_bookmarks = function() {
 
 var get_state = function() {
     try {
-        var json_string = atob(window.location.hash.slice(1))
+        var json_string = atob(window.location.hash.slice(1));
         return JSON.parse(json_string);
     } catch(e) {
         return null;

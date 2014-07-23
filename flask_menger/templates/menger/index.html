@@ -59,6 +59,9 @@
         <div class="col-md-8 col-sm-8">
           <table class="table table-hover table-bordered">
             <thead>
+              <tr data-bind="foreach: columns_headers">
+                <th data-bind="text: name, attr: {'colspan': colspan}"></th>
+              </tr>
               <tr data-bind="foreach: columns">
                 <th data-bind="text: label"></th>
               </tr>
