@@ -593,19 +593,16 @@ DataSet.prototype.list_bookmarks = function() {
 
 
 var get_state = function() {
-    return JSON.parse(
-        atob(window.location.hash.slice(1))
-    );
+    try {
+        var json_string = atob(window.location.hash.slice(1))
+        return JSON.parse(json_string);
+    } catch(e) {
+        return null;
+    }
 }
 
 var init = function() {
-    var json_state;
-    try {
-        json_state = get_state();
-    } catch (err) {
-        json_state = null;
-    }
-
+    var json_state = get_state();
     var ds = new DataSet(json_state);
     window.onpopstate = function(event) {
         ds.set_state(get_state());

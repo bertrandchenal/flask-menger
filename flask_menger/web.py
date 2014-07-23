@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import groupby, product, takewhile
+from itertools import groupby, product, takewhile, chain
 import logging
 import os
 import datetime
@@ -20,7 +20,6 @@ def get_label(space, name, value):
     if not value:
         return dim.label
     return "%s: %s" % (dim.label, dim.format(value))
-
 
 
 def get_dimension(space, name):
@@ -51,6 +50,42 @@ def get_measure(name):
             space._name, name))
 
     return msr
+
+
+def chained(fn):
+    def wrapper(*a, **kw):
+        return list(chain(fn(*a, **kw)))
+    return wrapper
+
+@chained
+def build_line(dimensions, key, type=type, split=True):
+    if split:
+        for dim, values in zip(dimensions, key):
+            for value in values:
+                yield value
+        return
+
+    for d, v in zip(dimensions, key):
+        yield d.format(v, type=type)
+
+
+@chained
+def build_headers(spc, coordinates, split=True):
+    if split:
+        for coordinate in coordinates:
+            for value in coordinate[1]:
+                yield {
+                    'label': str(value),
+                    'type': 'dimension',
+                }
+        return
+
+    for coordinate in coordinates:
+        yield {
+            'label': get_label(spc, coordinate[0], coordinate[1]),
+            'type': 'dimension',
+        }
+
 
 
 def dice(coordinates, measures, format_type=None, filters=None):
@@ -89,11 +124,8 @@ def dice(coordinates, measures, format_type=None, filters=None):
 
     # No pivot, return regular output
     if not pivot_name:
-        dim_cols = [{
-            'label': get_label(spc, d[0], d[1]),
-            'type': 'dimension',
-        } for d in coordinates]
-
+        dim_cols = build_headers(spc, coordinates)
+        print(dim_cols)
         data_dict = dice_by_msr(coordinates, measures, filters=filters)
         d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
         data = []
@@ -101,8 +133,8 @@ def dice(coordinates, measures, format_type=None, filters=None):
         measures = [get_measure(m) for m in measures]
 
         for key in product(*d_drills):
-            line = [d.format(v, type=format_type) \
-                    for d, v in zip(dimensions, key)]
+            line = build_line(dimensions, key, type=format_type)
+            print(key, line)
             line.extend(m.format(v, type=format_type) \
                         for m, v in zip(measures, data_dict[key]))
             data.append(line)
@@ -152,8 +184,7 @@ def dice(coordinates, measures, format_type=None, filters=None):
     for base_key in product(*r_drills):
         for tail in pivot_tails:
             # Fill line with regular coordinates
-            line = [d.format(k, type=format_type) \
-                    for d, k in zip(reg_dims, base_key)]
+            line = build_line(reg_dims, base_key, type=format_type)
 
             # Extend line for each pivot tails
             for pos, head in enumerate(pivot_heads):
@@ -177,10 +208,7 @@ def dice(coordinates, measures, format_type=None, filters=None):
             merged_data.append(line)
 
     # Construct columns metadata
-    cols = [{
-        'label': get_label(spc, d[0], d[1]),
-        'type': 'dimension',
-    } for d in regular_coords]
+    cols = build_headers(regular_coords)
 
     cols.append({
         'label': pivot_dim.levels[depth - 1],
