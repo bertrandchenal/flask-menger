@@ -241,14 +241,49 @@ def dice_by_msr(coordinates, measures, filters=None):
 
 def build_xlsx(res):
     import openpyxl
+    from openpyxl.cell import get_column_letter
 
     columns = res['columns']
-    wb = openpyxl.Workbook(optimized_write=True)
-    sheet = wb.create_sheet(title='Results')
-    sheet.append([c['label'] for c in columns])
+    headers = []
+    for col in columns:
+        headers.append(col.get('parent'))
+
+    wb = openpyxl.Workbook()
+    sheet = wb.active
+    sheet.title = 'Results'
+    offset = 1
+
+    if any(headers):
+        offset += 1
+        last_val = None
+        merge_from = None
+        for pos, val in enumerate(headers):
+            if last_val is not None and val == last_val:
+                if merge_from is None:
+                    merge_from = pos
+            else:
+                if merge_from is not None:
+                    sheet.merge_cells('%s1:%s1' % (
+                        get_column_letter(merge_from),
+                        get_column_letter(pos),
+                    ))
+                    merge_from = None
+
+                last_val = val
+                sheet.cell('%s1' % get_column_letter(pos+1)).value = val
+
+    for pos, c in enumerate(columns):
+        cell_id = '%s%s' % (get_column_letter(pos+1), offset)
+        sheet.cell(cell_id).value = c['label']
 
     for line in res['data']:
-        sheet.append(line)
+        offset += 1
+        for pos, value in enumerate(line):
+            cell_id = '%s%s' % (get_column_letter(pos+1), offset)
+            if isinstance(value, dict):
+                sheet.cell(cell_id).style = value['style']
+                value = value['value']
+            sheet.cell(cell_id).value = value
 
     out = os.path.join(mkdtemp(), 'result.xlsx')
     wb.save(out)
