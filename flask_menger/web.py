@@ -2,10 +2,7 @@ from collections import defaultdict
 from itertools import groupby, product, takewhile, chain
 import logging
 import os
-import datetime
 from tempfile import mkdtemp
-
-from flask import send_file, current_app
 
 from menger import Dimension, Measure, get_space
 
@@ -287,12 +284,5 @@ def build_xlsx(res):
 
     out = os.path.join(mkdtemp(), 'result.xlsx')
     wb.save(out)
-    attachment_filename = compute_filename(
-        current_app.config['MENGER_EXPORT_PATTERN'])
-    return send_file(out, as_attachment=True,
-                     attachment_filename=attachment_filename)
+    return out
 
-
-def compute_filename(pattern):
-    now = datetime.datetime.now()
-    return '%s.xlsx' % now.strftime(pattern)
