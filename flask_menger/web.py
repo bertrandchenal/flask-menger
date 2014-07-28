@@ -49,12 +49,12 @@ def get_measure(name):
     return msr
 
 
-def chained(fn):
+def listed(fn):
     def wrapper(*a, **kw):
-        return list(chain(fn(*a, **kw)))
+        return list(fn(*a, **kw))
     return wrapper
 
-@chained
+@listed
 def build_line(dimensions, key, coordinates, type=type, split=True):
     for dim, values, coord in zip(dimensions, key, coordinates):
         coord_name, coord_tuple = coord
@@ -63,8 +63,8 @@ def build_line(dimensions, key, coordinates, type=type, split=True):
                 value = [None] * pos + [value]
                 yield dim.format(value, offset=pos, type=type)
 
-@chained
-def build_headers(spc, coordinates):
+@listed
+def build_headers(spc, coordinates, force_parent=None):
     for coordinate in coordinates:
         for pos, value in enumerate(coordinate[1]):
             if value is not None:
@@ -72,10 +72,15 @@ def build_headers(spc, coordinates):
 
             dim = get_dimension(spc, coordinate[0])
             label = dim.levels[pos]
+            if force_parent is  None:
+                parent = get_label(spc, coordinate[0], coordinate[1])
+            else:
+                parent = force_parent
+
             yield {
                 'label': label,
                 'type': 'dimension',
-                'parent': get_label(spc, coordinate[0], coordinate[1]),
+                'parent': parent,
             }
 
 
@@ -178,12 +183,11 @@ def dice(coordinates, measures, format_type=None, filters=None):
 
             # Extend line for each pivot tails
             for pos, head in enumerate(pivot_heads):
-
                 # Add dim value in pivot col
                 if pos == 0:
-                    line.append(
-                        pivot_dim.format(head + tail, type=format_type,
-                                         offset=len(head))
+                    line.extend(
+                        build_line([pivot_dim], [head+tail], pivot_coords,
+                                   type=format_type)
                     )
 
                 key = base_key + (head + tail,)
@@ -199,11 +203,9 @@ def dice(coordinates, measures, format_type=None, filters=None):
 
     # Construct columns metadata
     cols = build_headers(spc, regular_coords)
+    pivot_cols = build_headers(spc, [pivot_coords[0]], force_parent='')
+    cols.extend(pivot_cols)
 
-    cols.append({
-        'label': pivot_dim.levels[depth - 1],
-        'type': 'dimension',
-    })
     for head in pivot_heads:
         prefix = pivot_dim.format(head, type=format_type)
         cols.extend({
