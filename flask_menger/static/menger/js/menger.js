@@ -374,7 +374,7 @@ DataSet.prototype.push_dim_select = function() {
         return ds.selected_dim().name;
     });
     var dim_name;
-    var dim_value = [];
+    var dim_value = [null];
     for (var pos in av) {
         var name = av[pos].name;
         if (currents.indexOf(name) < 0) {
