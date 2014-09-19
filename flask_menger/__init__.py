@@ -64,7 +64,7 @@ def mng(method, ext):
             output_file = build_xlsx(res)
             attachment_filename = compute_filename(
                 current_app.config['MENGER_EXPORT_PATTERN'])
-            return send_file(out, as_attachment=True,
+            return send_file(output_file, as_attachment=True,
                      attachment_filename=attachment_filename)
 
     else:
