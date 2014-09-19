@@ -225,16 +225,15 @@ def dice_by_msr(coordinates, measures, filters=None):
 
     data = defaultdict(lambda: [0 for _ in measures])
     key_len = len(coordinates)
-    for pos, (spc_name, msrs) in enumerate(spc_msr):
+    for spc_pos, (spc_name, msrs) in enumerate(spc_msr):
         spc = get_space(spc_name)
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
         filters = filters or {}
-        for line in spc.dice(coordinates, (m[1] for m in msrs), filters):
-            key, vals = line[:key_len], line[key_len:]
-            for vpos, val in enumerate(vals):
-                data[key][pos + vpos] = val
+        for key, vals in spc.dice(coordinates, (m[1] for m in msrs), filters):
+            for pos, val in enumerate(vals):
+                data[key][spc_pos + pos] = val
     return data
 
 
