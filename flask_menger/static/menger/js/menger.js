@@ -171,7 +171,7 @@ Dimension.prototype.set_value = function(value) {
         // value has been cut, show the last level in full
         value[value.length -1] = null;
     }
-    root.set_value(value);
+    return root.set_value(value);
 }
 
 Dimension.prototype.get_value = function() {
@@ -260,7 +260,7 @@ var DimSelect = function(dataset, dim_name, dim_value) {
 DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
     var clones = available.map(function (d) {
         var clone = new Dimension(d.name, d.label, d.levels(), this);
-        return clone
+        return clone;
     }.bind(this));
     this.dimensions(clones);
 
@@ -583,7 +583,6 @@ DataSet.prototype.fetch_data = function(mime) {
         this.columns(res.columns);
         return;
     }
-
     // Add empty value to prevent double-trigger of query
     DATA_CACHE[json_state] = {'data': []};
 

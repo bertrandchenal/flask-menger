@@ -163,6 +163,10 @@ def dice(coordinates, measures, format_type=None, filters=None):
     pivot_tails = set()
     for c, v in pivot_coords:
         head = get_head(v)
+        # Ignore mal-constructed pivot coordinates
+        if pivot_heads and len(pivot_heads[-1]) != len(head):
+            continue
+
         pivot_heads.append(head)
         cut = len(head)
         for child in get_dimension(spc, c).glob(v):
