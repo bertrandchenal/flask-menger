@@ -182,7 +182,7 @@ Dimension.prototype.get_value = function() {
         });
         var value;
         if (actives.length) {
-            value = actives[0].value;
+            value = actives[0].value.slice();
         } else {
             value = coord.value.slice();
             value.push(null);
