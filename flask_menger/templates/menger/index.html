@@ -1,183 +1,187 @@
 {% extends "layout.html" %}
 
-    {% block title %}
-    <title>{{config.APP_NAME|capitalize}}</title>
-    {% endblock %}
+{% block title %}
+<title>{{config.APP_NAME|capitalize}}</title>
+{% endblock %}
 
-    {% block head %}
-    <link href="{{url_for('menger.static', filename='css/libs.css')}}" rel="stylesheet">
-    <link href="{{url_for('menger.static', filename='css/menger.css')}}" rel="stylesheet">
-    <script src="{{url_for('menger.static', filename='js/libs.js')}}"></script>
-    <script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
-    {% endblock %}
+{% block head %}
+<link href="{{url_for('menger.static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+<link href="{{url_for('menger.static', filename='css/menger.css')}}" rel="stylesheet">
+<script src="{{url_for('menger.static', filename='js/jquery-1.11.1.min.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/bootstrap.min.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/knockout-3.1.0.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
+{% endblock %}
 
-    {% block container %}
-      <div class="row">
-        <div class="col-md-4 col-sm-4 left-menu">
-          <h4>Measures</h4>
-          <div class="panel-group" id="measures"
-               data-bind="template: {name: 'measure_tpl', foreach: measures}">
-          </div>
-          <div class="btn-group">
-            <button type="button" class="btn btn-default"
-                    title="Remove measure"
-                    data-bind="click: pop_measure,
-                               attr:{disabled: measures().length <= 1}">
-              <span class="glyphicon glyphicon-minus"></span>
-            </button>
-            <button type="button" class="btn btn-default"
-                    title="Add measure"
-                    data-bind="click: push_measure">
-              <span class="glyphicon glyphicon-plus"></span>
-            </button>
-          </div>
+{% block container %}
+<div class="row">
+  <div class="col-md-4 col-sm-4 left-menu">
+    <h4>Measures</h4>
+    <div class="panel-group" id="measures"
+         data-bind="template: {name: 'measure_tpl', foreach: measures}">
+    </div>
+    <div class="btn-group">
+      <button type="button" class="btn btn-default"
+              title="Remove measure"
+              data-bind="click: pop_measure,
+                         attr:{disabled: measures().length <= 1}">
+        <span class="glyphicon glyphicon-minus"></span>
+      </button>
+      <button type="button" class="btn btn-default"
+              title="Add measure"
+              data-bind="click: push_measure">
+        <span class="glyphicon glyphicon-plus"></span>
+      </button>
+    </div>
 
-          <h4>Dimensions</h4>
+    <h4>Dimensions</h4>
 
-          <div class="panel-group" id="dimensions"
-               data-bind="template: {name: 'dimension_tpl', foreach: dim_selects}">
-          </div>
-          <div class="btn-group">
-            <button type="button" class="btn btn-default"
-                    title="Remove dimension"
-                    data-bind="click: pop_dim_select,
-                               attr:{disabled: dim_selects().length <= 1}">
-              <span class="glyphicon glyphicon-minus"></span>
-            </button>
-            <button type="button" class="btn btn-default"
-                    title="Add dimension"
-                    data-bind="click: push_dim_select">
-              <span class="glyphicon glyphicon-plus"></span>
-            </button>
-          </div>
+    <div class="panel-group" id="dimensions"
+         data-bind="template: {name: 'dimension_tpl', foreach: dim_selects}">
+    </div>
+    <div class="btn-group">
+      <button type="button" class="btn btn-default"
+              title="Remove dimension"
+              data-bind="click: pop_dim_select,
+                         attr:{disabled: dim_selects().length <= 1}">
+        <span class="glyphicon glyphicon-minus"></span>
+      </button>
+      <button type="button" class="btn btn-default"
+              title="Add dimension"
+              data-bind="click: push_dim_select">
+        <span class="glyphicon glyphicon-plus"></span>
+      </button>
+    </div>
 
-          <hr>
-          <h4>Exports</h4>
-          <a type="button" class="btn btn-default"
-             href="#" title="Dowload Excel file"
-             data-bind="click: get_xlsx">
-            Excel <span class="glyphicon glyphicon-download"></span>
+    <hr>
+    <h4>Exports</h4>
+    <a type="button" class="btn btn-default"
+       href="#" title="Dowload Excel file"
+       data-bind="click: get_xlsx">
+      Excel <span class="glyphicon glyphicon-download"></span>
+    </a>
+  </div>
+
+  <div class="col-md-8 col-sm-8">
+    <table class="table table-hover table-bordered">
+      <thead>
+        <tr data-bind="foreach: columns_headers">
+          <th data-bind="text: name, attr: {'colspan': colspan}"></th>
+        </tr>
+        <tr data-bind="foreach: columns">
+          <th data-bind="text: label"></th>
+        </tr>
+      </thead>
+      <tbody data-bind="foreach: {data: data, as: 'line'}">
+        <tr data-bind="foreach: $parent.columns">
+          <td data-bind="text: line[$index()], css: type"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div> <!-- /.row -->
+{% endblock %}
+
+{% block postscripts %}
+<script type="text/html" id="measure_tpl">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <a data-toggle="collapse" data-parent="#measures"
+           data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
+        </a>
+      </h4>
+    </div>
+    <div class="panel-collapse collapse"
+         data-bind="attr: {id: 'collapse-measure-' + $index()}">
+      <!-- <div class="panel-body"> -->
+      <div class="list-group menu-list" data-bind="foreach: $root.available_measures">
+        <li class="list-group-item menu-item"
+            data-bind="css: {active: $data === $parent}">
+          <a href="#"
+             data-bind="text: fullname,
+                        click: $root.select_measure.bind(
+                        $root, $data, $parentContext.$index())">
           </a>
-        </div>
-
-        <div class="col-md-8 col-sm-8">
-          <table class="table table-hover table-bordered">
-            <thead>
-              <tr data-bind="foreach: columns_headers">
-                <th data-bind="text: name, attr: {'colspan': colspan}"></th>
-              </tr>
-              <tr data-bind="foreach: columns">
-                <th data-bind="text: label"></th>
-              </tr>
-            </thead>
-            <tbody data-bind="foreach: {data: data, as: 'line'}">
-              <tr data-bind="foreach: $parent.columns">
-                <td data-bind="text: line[$index()], css: type"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-      </div> <!-- /.row -->
-    {% endblock %}
-
-    {% block postscripts %}
-    <script type="text/html" id="measure_tpl">
-      <div class="panel panel-default">
-        <div class="panel-heading">
-          <h4 class="panel-title">
-            <a data-toggle="collapse" data-parent="#measures"
-               data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
-            </a>
-          </h4>
-        </div>
-        <div class="panel-collapse collapse"
-             data-bind="attr: {id: 'collapse-measure-' + $index()}">
-          <div class="panel-body">
-            <div class="list-group" data-bind="foreach: $root.available_measures">
-              <li class="list-group-item" data-bind="css: {active: $data === $parent}">
-                <a href="#"
-                   data-bind="text: fullname,
-                              click: $root.select_measure.bind(
-                              $root, $data, $parentContext.$index())">
-                </a>
-              </li>
-            </div>
-          </div>
-        </div>
+        </li>
       </div>
-    </script>
+      <!-- </div> -->
+    </div>
+  </div>
+</script>
 
-    <script type="text/html" id="dimension_tpl">
-      <div class="panel panel-default"  style="overflow: visible">
-        <div class="panel-heading">
-          <h4 class="panel-title">
-            <span data-bind="if: can_drill_up()">
-              <a class="glyphicon glyphicon-chevron-left"
-                 data-bind="click: drill_up"></a>
-            </span>
-            <a data-toggle="collapse" data-parent="#dimensions"
-               data-bind="attr: {href: '#collapse-dimension-' + $index()},
-                          text: label">
-            </a>
-            <a class="glyphicon pull-right"
-               data-bind="click: toggle_options, css: {active: show_options},
-                          if: selected_dim().selected_coord()">
-              &#9776;
-            </a>
-          </h4>
-        </div>
-        <div class="panel-collapse collapse"
-             data-bind="attr: {id: 'collapse-dimension-' + $index()},
-                        css: {option: show_options}">
-          <div class="panel-body">
-            <div data-bind="if:show_options()">
-              <h5>Show:</h5>
+<script type="text/html" id="dimension_tpl">
+  <div class="panel panel-default"  style="overflow: visible">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <span data-bind="if: can_drill_up()">
+          <a class="glyphicon glyphicon-chevron-left"
+             data-bind="click: drill_up"></a>
+        </span>
+        <a data-toggle="collapse" data-parent="#dimensions"
+           data-bind="attr: {href: '#collapse-dimension-' + $index()},
+                      text: label">
+        </a>
+        <a class="glyphicon pull-right"
+           data-bind="click: toggle_options, css: {active: show_options},
+                      if: selected_dim().selected_coord()">
+          &#9776;
+        </a>
+      </h4>
+    </div>
+    <div class="panel-collapse collapse"
+         data-bind="attr: {id: 'collapse-dimension-' + $index()},
+                    css: {option: show_options}">
+      <div data-bind="if:show_options()">
+        <div class="panel-body">
+          <h5>Show:</h5>
 
-              <div class="btn-group">
-                <!-- ko foreach: head_levels -->
-                <button type="button" class="btn btn-default"
-                        data-bind="css: {active: active}, text: name, click: activate">
-                </button>
-                <!-- /ko -->
-                <!-- ko if: tail_levels().length -->
-                <div class="btn-group">
-                  <button type="button" class="btn btn-default dropdown-toggle"
-                          data-toggle="dropdown">
-                    <span class="caret"></span>
-                  </button>
-                  <ul class="dropdown-menu"
-                      data-bind="foreach: tail_levels">
-                    <li data-bind="css: {active: active}">
-                      <a href="#" data-bind="text: name, click: activate">
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-                <!-- /ko -->
-
-              </div>
-            </div> <!-- /options -->
-
-            <div data-bind="if:!show_options()">
-              <ul class="list-group" data-bind="foreach:choice">
-                <li class="list-group-item clearfix" data-bind="css: {active: active()}">
-                  <a href="#"
-                     data-bind="text: label,
-                                click: activate">
+          <div class="btn-group">
+            <!-- ko foreach: head_levels -->
+            <button type="button" class="btn btn-default"
+                    data-bind="css: {active: active}, text: name, click: activate">
+            </button>
+            <!-- /ko -->
+            <!-- ko if: tail_levels().length -->
+            <div class="btn-group">
+              <button type="button" class="btn btn-default dropdown-toggle"
+                      data-toggle="dropdown">
+                <span class="caret"></span>
+              </button>
+              <ul class="dropdown-menu"
+                  data-bind="foreach: tail_levels">
+                <li data-bind="css: {active: active}">
+                  <a href="#" data-bind="text: name, click: activate">
                   </a>
-                  <div data-bind="if: has_children()" class="pull-right">
-                    <a href="#" class="glyphicon glyphicon-chevron-right"
-                       data-bind="click: drill">
-                    </a>
-                  </div>
                 </li>
               </ul>
-            </div> <!-- /dimension children -->
-
-          </div>
+            </div>
+            <!-- /ko -->
+          </div> <!-- /options -->
         </div>
       </div>
 
-    </script>
-    {% endblock %}
+      <div data-bind="if:!show_options()">
+        <ul class="list-group menu-list" data-bind="foreach:choice"
+            style="border-top: 1px solid #DDD">
+          <li class="list-group-item clearfix menu-item"
+              data-bind="css: {active: active()}">
+            <a href="#"
+               data-bind="text: label,
+                          click: activate">
+            </a>
+            <div data-bind="if: has_children()" class="pull-right">
+              <a href="#" class="glyphicon glyphicon-chevron-right"
+                 data-bind="click: drill">
+              </a>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+</script>
+{% endblock %}

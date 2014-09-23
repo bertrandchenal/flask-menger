@@ -44,3 +44,12 @@ td.measure {
 .wait {
     cursor: wait;
 }
+
+.list-group-item.menu-item {
+    border: none;
+    border-radius: 0;
+}
+
+.list-group.menu-list {
+    border-top: 1px solid #DDD;
+}
