@@ -287,10 +287,22 @@ DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
 };
 
 DimSelect.prototype.toggle_options = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+    collapse.collapse('show');
+
     this.show_options(!this.show_options());
 };
 
-DimSelect.prototype.drill_up = function() {
+DimSelect.prototype.drill_up = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+    collapse.collapse('show');
+    // drill up and hide options
     this.selected_dim().drill_up();
     this.show_options(false);
 };
