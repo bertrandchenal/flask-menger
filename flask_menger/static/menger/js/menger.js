@@ -291,9 +291,9 @@ DimSelect.prototype.toggle_options = function(dim_select, ev) {
     var target = $(ev.target);
     var heading = target.parents('.panel-heading');
     var collapse = heading.next('.panel-collapse');
-    collapse.collapse('show');
 
     this.show_options(!this.show_options());
+    collapse.collapse('show');
 };
 
 DimSelect.prototype.drill_up = function(dim_select, ev) {
