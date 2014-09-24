@@ -595,9 +595,6 @@ DataSet.prototype.fetch_data = function(mime) {
         this.columns(res.columns);
         return;
     }
-    // Add empty value to prevent double-trigger of query
-    DATA_CACHE[json_state] = {'data': []};
-
     var url = '/mng/dice.' + (mime || 'json') + '?' +  $.param({'query': json_state});;
     if (mime) {
         window.location.href = url;
