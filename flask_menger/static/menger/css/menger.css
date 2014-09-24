@@ -23,7 +23,7 @@ li.active a {
 }
 
 
-td.measure {
+td.measure, th.measure {
     text-align: right;
 }
 
