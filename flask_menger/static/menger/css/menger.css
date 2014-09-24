@@ -7,7 +7,7 @@ li.active a {
 }
 
 .list-group {
-    max-height: 20em;
+    max-height: 21em;
     overflow: auto;
 }
 
@@ -52,4 +52,5 @@ td.measure, th.measure {
 
 .list-group.menu-list {
     border-top: 1px solid #DDD;
+    margin-bottom: 0;
 }
