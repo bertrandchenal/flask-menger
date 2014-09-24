@@ -61,7 +61,7 @@ def build_line(dimensions, key, coordinates, type=type):
     # None in values)
     if not line:
         for dim, values, coord in zip(dimensions, key, coordinates):
-            line.append(dim.format(values, type=type))
+            line.append(dim.format([values[-1]], type=type))
 
     return line
 
@@ -91,7 +91,7 @@ def build_headers(spc, coordinates, force_parent=None):
             dim = get_dimension(spc, coordinate[0])
             label = dim.levels[len(coordinate[1]) - 1]
             if force_parent is  None:
-                parent = get_label(spc, coordinate[0], coordinate[1])
+                parent = get_label(spc, coordinate[0], coordinate[1][:-1])
             else:
                 parent = force_parent
 
