@@ -619,12 +619,6 @@ DataSet.prototype.get_xlsx = function() {
     this.fetch_data('xlsx');
 };
 
-DataSet.prototype.create_bookmark = function() {
-};
-
-DataSet.prototype.list_bookmarks = function() {
-};
-
 
 var get_state = function() {
     try {
