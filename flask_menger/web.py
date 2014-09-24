@@ -48,23 +48,25 @@ def get_measure(name):
 
     return msr
 
-
-def listed(fn):
-    def wrapper(*a, **kw):
-        return list(fn(*a, **kw))
-    return wrapper
-
-@listed
-def build_line(dimensions, key, coordinates, type=type, split=True):
+def build_line(dimensions, key, coordinates, type=type):
+    line = []
     for dim, values, coord in zip(dimensions, key, coordinates):
         coord_name, coord_tuple = coord
         for pos, value in enumerate(values):
             if coord_tuple[pos] is None:
                 value = [None] * pos + [value]
-                yield dim.format(value, offset=pos, type=type)
+                line.append(dim.format(value, offset=pos, type=type))
 
-@listed
+    # Force display of all dimensions if they are all frozen (aka no
+    # None in values)
+    if not line:
+        for dim, values, coord in zip(dimensions, key, coordinates):
+            line.append(dim.format(values, type=type))
+
+    return line
+
 def build_headers(spc, coordinates, force_parent=None):
+    headers = []
     for coordinate in coordinates:
         for pos, value in enumerate(coordinate[1]):
             if value is not None:
@@ -77,12 +79,30 @@ def build_headers(spc, coordinates, force_parent=None):
             else:
                 parent = force_parent
 
-            yield {
+            headers.append({
                 'label': label,
                 'type': 'dimension',
                 'parent': parent,
-            }
+            })
 
+    # Force display of all dimensions if they are all frozen
+    if not headers:
+        for coordinate in coordinates:
+            dim = get_dimension(spc, coordinate[0])
+            label = dim.levels[len(coordinate[1]) - 1]
+            if force_parent is  None:
+                parent = get_label(spc, coordinate[0], coordinate[1])
+            else:
+                parent = force_parent
+
+
+            headers.append({
+                'label': label,
+                'type': 'dimension',
+                'parent': parent,
+            })
+
+    return headers
 
 def dice(coordinates, measures, format_type=None, filters=None):
     # Get space
