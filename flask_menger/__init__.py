@@ -11,6 +11,11 @@ menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
 
+def sorter(order):
+    def wrapped(el):
+        name = el['name']
+        return order.index(name)
+    return wrapped
 
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
 @login_required
@@ -36,6 +41,10 @@ def mng(method, ext):
                 } for d in space._dimensions],
                 'label': space._label,
             }
+            if hasattr(space, 'dim_order'):
+                order = space.dim_order
+                res[name]['dimensions'].sort(key=sorter(order))
+
         return json.jsonify(**res)
 
     query = json.loads(request.args.get('query', '{}'))
