@@ -43,9 +43,6 @@ def mng(method, ext):
                 } for d in space._dimensions],
                 'label': space._label,
             }
-            if hasattr(space, 'dim_order'):
-                order = space.dim_order
-                space_info['dimensions'].sort(key=sorter(order))
             spaces.append(space_info)
 
         return json.jsonify(spaces=spaces)
