@@ -434,20 +434,24 @@ DataSet.prototype.pop_dim_select = function() {
 };
 
 DataSet.prototype.set_info = function(info) {
-    for (var space_name in info) {
+    var spaces = info.spaces;
+
+    for (var pos in spaces) {
+        var spc = spaces[pos]
         var dimensions = [];
-        for (var pos in info[space_name]['dimensions']) {
-            var dim = info[space_name]['dimensions'][pos];
+        for (var pos in spc.dimensions) {
+            var dim = spc.dimensions[pos];
             dimensions.push(new Dimension(dim.name, dim.label, dim.levels));
         }
-        DIM_CACHE[space_name] = dimensions;
+        DIM_CACHE[spc.name] = dimensions;
     }
 
     var measures = [];
-    for (var space_name in info) {
-        var space = new Space(space_name, info[space_name]['label']);
-        for (var pos in info[space_name]['measures']) {
-            var msr = info[space_name]['measures'][pos];
+    for (var pos in spaces) {
+        var spc = spaces[pos];
+        var space = new Space(spc.name, spc.label);
+        for (var pos in spc.measures) {
+            var msr = spc.measures[pos];
             measures.push(new Measure(space, msr.name, msr.label));
         }
     }

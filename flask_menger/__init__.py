@@ -28,8 +28,10 @@ def mng(method, ext):
         filters = None
 
     if method == 'info':
-        for name, space in iter_spaces():
-            res[name] = {
+        spaces = []
+        for space in iter_spaces():
+            space_info = {
+                'name': space._name,
                 'measures': [{
                     'name': m.name,
                     'label': m.label,
@@ -43,9 +45,10 @@ def mng(method, ext):
             }
             if hasattr(space, 'dim_order'):
                 order = space.dim_order
-                res[name]['dimensions'].sort(key=sorter(order))
+                space_info['dimensions'].sort(key=sorter(order))
+            spaces.append(space_info)
 
-        return json.jsonify(**res)
+        return json.jsonify(spaces=spaces)
 
     query = json.loads(request.args.get('query', '{}'))
 
