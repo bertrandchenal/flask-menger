@@ -311,6 +311,43 @@ DimSelect.prototype.can_drill_up = function() {
     return this.selected_dim().selected_coord();
 };
 
+DimSelect.prototype.move_up = function() {
+    var dim_selects = this.dataset.dim_selects();
+    var pos = dim_selects.indexOf(this)
+    if (pos < 1) {
+        return;
+    }
+    // Remove
+    dim_selects.splice(pos, 1);
+    // Re-add this one position before
+    dim_selects.splice(pos-1, 0, this);
+    this.dataset.dim_selects(dim_selects)
+};
+
+DimSelect.prototype.move_down = function() {
+    var dim_selects = this.dataset.dim_selects();
+    var pos = dim_selects.indexOf(this)
+    if (pos < 0 || pos >= dim_selects.length - 1) {
+        return;
+    }
+    // Remove this
+    dim_selects.splice(pos, 1);
+    // Re-add this one position after
+    dim_selects.splice(pos+1, 0, this);
+    this.dataset.dim_selects(dim_selects)
+};
+
+DimSelect.prototype.remove = function() {
+    var dim_selects = this.dataset.dim_selects();
+    var pos = dim_selects.indexOf(this)
+    if (pos < 0) {
+        return;
+    }
+    // Remove this
+    dim_selects.splice(pos, 1);
+    this.dataset.dim_selects(dim_selects)
+};
+
 
 var Level = function(name, index, dimsel) {
     this.name = name;
