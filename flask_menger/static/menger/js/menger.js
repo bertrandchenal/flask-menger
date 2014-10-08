@@ -595,7 +595,8 @@ DataSet.prototype.refresh_dimensions = function() {
 
 DataSet.prototype.set_state = function(state) {
     this.ready(false);
-    this.skip_zero(state.skip_zero);
+    var sz = state.skip_zero === undefined || state.skip_zero;
+    this.skip_zero(sz);
     this.state = state || {};
     // Reset data
     this.dim_selects([]);
