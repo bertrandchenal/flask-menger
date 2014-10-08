@@ -54,12 +54,22 @@
     </div>
 
     <hr>
-    <h4>Exports</h4>
-    <a type="button" class="btn btn-default"
-       href="#" title="Dowload Excel file"
-       data-bind="click: get_xlsx">
-      Excel <span class="glyphicon glyphicon-download"></span>
-    </a>
+
+    <h4>Options</h4>
+    <div class="form-group">
+      <label class="checkbox-inline">
+        <input type="checkbox" id="inlineCheckbox1"
+               data-bind="checked: skip_zero">
+        Hide empty lines
+      </label>
+    </div>
+    <div class="form-group">
+      <a type="button" class="btn btn-default"
+         href="#" title="Dowload Excel file"
+         data-bind="click: get_xlsx">
+        Excel Export <span class="glyphicon glyphicon-download"></span>
+      </a>
+    </div>
   </div>
 
   <div class="col-md-9 col-sm-9">

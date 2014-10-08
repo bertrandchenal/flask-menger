@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import groupby, product, takewhile, chain
+from itertools import groupby, product, takewhile, cycle
 import logging
 import os
 from tempfile import mkdtemp
@@ -104,7 +104,12 @@ def build_headers(spc, coordinates, force_parent=None):
 
     return headers
 
-def dice(coordinates, measures, format_type=None, filters=None):
+def dice(coordinates, measures, **options):
+
+    format_type = options.get('format_type')
+    filters = options.get('filters')
+    skip_zero = options.get('skip_zero')
+
     # Get space
     spc_name = measures[0].split('.')[0]
     spc = get_space(spc_name)
@@ -149,8 +154,15 @@ def dice(coordinates, measures, format_type=None, filters=None):
 
         for key in product(*d_drills):
             line = build_line(dimensions, key, coordinates, type=format_type)
+            values = data_dict.get(key, [])
+
+            # Skip zeros if asked
+            if skip_zero and not any(values):
+                continue
+
+            values = data_dict[key]
             line.extend(m.format(v, type=format_type) \
-                        for m, v in zip(measures, data_dict[key]))
+                        for m, v in zip(measures, values))
             data.append(line)
         return data, dim_cols + msr_cols
 
@@ -205,6 +217,8 @@ def dice(coordinates, measures, format_type=None, filters=None):
             line = build_line(reg_dims, base_key, regular_coords,
                               type=format_type)
 
+
+            msr_vals = []
             # Extend line for each pivot tails
             for pos, head in enumerate(pivot_heads):
                 # Add dim value in pivot col
@@ -214,15 +228,21 @@ def dice(coordinates, measures, format_type=None, filters=None):
                                    type=format_type)
                     )
 
+                # Add measure values
                 key = base_key + (head + tail,)
                 vals = datas[pos][key]
-                if vals is None:
-                    continue
-                # Add measure values
-                line.extend(m.format(v, type=format_type) \
-                            for m,v in zip(measures, vals))
+                msr_vals.extend(vals)
 
-            # Format line
+            # Skip zeros if asked
+            if skip_zero and not any(msr_vals):
+                continue
+
+            line.extend(
+                m.format(v, type=format_type) \
+                for m, v in zip(cycle(measures), msr_vals)
+            )
+
+            # Add line to grand result
             merged_data.append(line)
 
     # Construct columns metadata

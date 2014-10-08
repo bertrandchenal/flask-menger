@@ -377,6 +377,7 @@ var DataSet = function(json_state) {
     this.json_state = ko.observable();
     this.state = {};
     this.ready = ko.observable(false);
+    this.skip_zero = ko.observable(true);
 
     // fetch meta-data and init state
     $.get('/mng/info.json').then(function(info) {
@@ -594,6 +595,7 @@ DataSet.prototype.refresh_dimensions = function() {
 
 DataSet.prototype.set_state = function(state) {
     this.ready(false);
+    this.skip_zero(state.skip_zero);
     this.state = state || {};
     // Reset data
     this.dim_selects([]);
@@ -618,6 +620,7 @@ DataSet.prototype.refresh_state = function() {
             var value = dimension.get_value();
             return [dimension.name, value]
         }),
+        'skip_zero': this.skip_zero(),
     }
     this.json_state(JSON.stringify(this.state));
 

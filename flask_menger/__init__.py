@@ -102,10 +102,11 @@ def do_dice(query, filters, ext):
     if not measures:
         return ('Key "measures" is empty', 404)
 
+    skip_zero = query.get('skip_zero')
     with connect(current_app.config['MENGER_DATABASE']):
         data, columns = dice(dimensions, measures,
                              format_type=format_type,
-                             filters=filters)
+                             filters=filters, skip_zero=skip_zero)
         res['data'] = data
         res['columns'] = columns
 
