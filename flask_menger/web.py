@@ -153,14 +153,13 @@ def dice(coordinates, measures, **options):
         measures = [get_measure(m) for m in measures]
 
         for key in product(*d_drills):
-            line = build_line(dimensions, key, coordinates, type=format_type)
             values = data_dict.get(key, [])
-
             # Skip zeros if asked
             if skip_zero and not any(values):
                 continue
 
             values = data_dict[key]
+            line = build_line(dimensions, key, coordinates, type=format_type)
             line.extend(m.format(v, type=format_type) \
                         for m, v in zip(measures, values))
             data.append(line)
@@ -213,21 +212,10 @@ def dice(coordinates, measures, **options):
 
     for base_key in product(*r_drills):
         for tail in pivot_tails:
-            # Fill line with regular coordinates
-            line = build_line(reg_dims, base_key, regular_coords,
-                              type=format_type)
 
-
+            # Build measures
             msr_vals = []
-            # Extend line for each pivot tails
             for pos, head in enumerate(pivot_heads):
-                # Add dim value in pivot col
-                if pos == 0:
-                    line.extend(
-                        build_line([pivot_dim], [head+tail], pivot_coords,
-                                   type=format_type)
-                    )
-
                 # Add measure values
                 key = base_key + (head + tail,)
                 vals = datas[pos][key]
@@ -237,6 +225,19 @@ def dice(coordinates, measures, **options):
             if skip_zero and not any(msr_vals):
                 continue
 
+            # Fill line with regular coordinates
+            line = build_line(reg_dims, base_key, regular_coords,
+                              type=format_type)
+
+            # Add pivot dimensions to line
+            for pos, head in enumerate(pivot_heads):
+                if pos == 0:
+                    line.extend(
+                        build_line([pivot_dim], [head+tail], pivot_coords,
+                                   type=format_type)
+                    )
+
+            # Append measures
             line.extend(
                 m.format(v, type=format_type) \
                 for m, v in zip(cycle(measures), msr_vals)
