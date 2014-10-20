@@ -1,8 +1,9 @@
 "use strict"
 
-var DIM_CACHE = {}
-var DATA_CACHE = {}
-var DRILL_CACHE = {}
+var DIM_CACHE = {};
+var DATA_CACHE = {};
+var DRILL_CACHE = {};
+var PAGE_LENGTH = 100;
 
 // Force waiting cursor when an ajax call is in progress
 $.ajaxSetup({
@@ -373,6 +374,7 @@ var DataSet = function(json_state) {
     this.dim_selects = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
     this.data = ko.observable();
+    this.limit = ko.observable(PAGE_LENGTH);
     this.columns = ko.observable([]);
     this.json_state = ko.observable();
     this.state = {};
@@ -391,6 +393,28 @@ var DataSet = function(json_state) {
     ko.computed(this.refresh_state.bind(this)).extend({
         'rateLimit': 10,
     });
+
+    this.get_data = ko.computed(function() {
+        var res = this.data();
+        if (res && res.length > this.limit()) {
+            return res.slice(0, this.limit());
+        }
+        return res;
+    }, this);
+
+    this.data.subscribe(function() {
+        this.limit(PAGE_LENGTH);
+    }, this);
+
+
+    window.onscroll = function(ev) {
+        var full_height = document.body.offsetHeight;
+        var position = window.innerHeight + window.scrollY;
+        var near_bottom = position >= full_height * 0.9;
+        if (this.data() && near_bottom && this.data().length > this.limit()) {
+            this.limit(this.limit() + PAGE_LENGTH);
+        }
+    }.bind(this);
 
     this.columns_headers = ko.computed(function() {
         // Collect parent title for all columns

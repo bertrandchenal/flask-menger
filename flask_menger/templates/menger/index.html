@@ -84,7 +84,7 @@
               <th data-bind="text: label, css: type"></th>
             </tr>
           </thead>
-          <tbody data-bind="foreach: {data: data, as: 'line'}">
+          <tbody data-bind="foreach: {data: get_data, as: 'line'}">
             <tr data-bind="foreach: $parent.columns">
               <td data-bind="text: line[$index()], css: type"></td>
             </tr>
