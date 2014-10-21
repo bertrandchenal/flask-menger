@@ -52,30 +52,28 @@ def build_line(dimensions, key, coordinates, type=type):
     line = []
     for dim, values, coord in zip(dimensions, key, coordinates):
         coord_name, coord_tuple = coord
+        # Frozen dimension: we only show last value
+        if None not in coord_tuple:
+            line.append(dim.format(values[-1:], type=type))
+            continue
+
         for pos, value in enumerate(values):
             if coord_tuple[pos] is None:
                 value = [None] * pos + [value]
                 line.append(dim.format(value, offset=pos, type=type))
 
-    # Force display of all dimensions if they are all frozen (aka no
-    # None in values)
-    if not line:
-        for dim, values, coord in zip(dimensions, key, coordinates):
-            line.append(dim.format([values[-1]], type=type))
-
     return line
+
 
 def build_headers(spc, coordinates, force_parent=None):
     headers = []
-    for coordinate in coordinates:
-        for pos, value in enumerate(coordinate[1]):
-            if value is not None:
-                continue
-
-            dim = get_dimension(spc, coordinate[0])
-            label = dim.levels[pos]
+    for coord_name, coord_tuple in coordinates:
+        dim = get_dimension(spc, coord_name)
+        # Frozen dimension: we only show one column
+        if None not in coord_tuple:
+            label = dim.levels[len(coord_tuple) - 1]
             if force_parent is  None:
-                parent = get_label(spc, coordinate[0], coordinate[1])
+                parent = get_label(spc, coord_name, coord_tuple[:-1])
             else:
                 parent = force_parent
 
@@ -84,17 +82,16 @@ def build_headers(spc, coordinates, force_parent=None):
                 'type': 'dimension',
                 'parent': parent,
             })
+            continue
 
-    # Force display of all dimensions if they are all frozen
-    if not headers:
-        for coordinate in coordinates:
-            dim = get_dimension(spc, coordinate[0])
-            label = dim.levels[len(coordinate[1]) - 1]
+        for pos, value in enumerate(coord_tuple):
+            if value is not None:
+                continue
+            label = dim.levels[pos]
             if force_parent is  None:
-                parent = get_label(spc, coordinate[0], coordinate[1][:-1])
+                parent = get_label(spc, coord_name, coord_tuple)
             else:
                 parent = force_parent
-
 
             headers.append({
                 'label': label,
@@ -103,6 +100,7 @@ def build_headers(spc, coordinates, force_parent=None):
             })
 
     return headers
+
 
 def dice(coordinates, measures, **options):
 
