@@ -535,9 +535,16 @@ DataSet.prototype.measures_changed = function(measures) {
         dimensions = [];
         for (var x in unfiltered) {
             var dim = unfiltered[x];
+            var candidate = null;
             for (var y in others) {
-                if (dim.name == others[y].name) {
-                    dimensions.push(dim);
+                var other = others[y];
+                if (dim.name == other.name) {
+                    // Keep the shallowest dimension
+                    if (other.levels().length < dim.levels().length) {
+                        dimensions.push(other);
+                    } else {
+                        dimensions.push(dim);
+                    }
                     break;
                 }
             }
