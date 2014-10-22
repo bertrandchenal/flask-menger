@@ -54,7 +54,9 @@ def build_line(dimensions, key, coordinates, type=type):
         coord_name, coord_tuple = coord
         # Frozen dimension: we only show last value
         if None not in coord_tuple:
-            line.append(dim.format(values[-1:], type=type))
+            offset = len(values) - 1
+            val = [None] * offset + [values[-1]]
+            line.append(dim.format(val, offset=offset, type=type))
             continue
 
         for pos, value in enumerate(values):
