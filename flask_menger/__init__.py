@@ -104,13 +104,9 @@ def do_dice(query, filters, ext):
 
     skip_zero = query.get('skip_zero')
     with connect(current_app.config['MENGER_DATABASE']):
-        data, columns = dice(dimensions, measures,
+        return dice(dimensions, measures,
                              format_type=format_type,
                              filters=filters, skip_zero=skip_zero)
-        res['data'] = data
-        res['columns'] = columns
-
-        return res
 
 def compute_filename(pattern):
     now = datetime.datetime.now()

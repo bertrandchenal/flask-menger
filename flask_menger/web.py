@@ -152,7 +152,7 @@ def dice(coordinates, measures, **options):
         data = []
         dimensions = [get_dimension(spc, d) for d, v in coordinates]
         measures = [get_measure(m) for m in measures]
-
+        totals = None
         for key in product(*d_drills):
             values = data_dict.get(key, [])
             # Skip zeros if asked
@@ -164,11 +164,32 @@ def dice(coordinates, measures, **options):
             line.extend(m.format(v, type=format_type) \
                         for m, v in zip(measures, values))
             data.append(line)
-        return data, dim_cols + msr_cols
+
+            # Aggregate totals
+            if totals is None:
+                totals = values
+            else:
+                for pos, v in enumerate(values):
+                    totals[pos] += v
+
+        # Add total line
+        if len(data) > 1:
+            total_line = [''] * len(dim_cols)
+            total_line.extend(m.format(v, type=format_type) \
+                              for m, v in zip(measures, totals))
+        else:
+            total_line = None
+
+        return {
+            'data': data,
+            'columns': dim_cols + msr_cols,
+            'totals': total_line,
+        }
 
     pivot_dim = get_dimension(spc, pivot_name)
     # split coordinates and get pivot values depth
     depth = None
+    totals = None
     pivot_coords = []
     regular_coords = []
     coord_dict = dict(coordinates)
@@ -251,6 +272,22 @@ def dice(coordinates, measures, **options):
             # Add line to grand result
             merged_data.append(line)
 
+            # Aggregate totals
+            if totals is None:
+                totals = msr_vals
+            else:
+                for pos, v in enumerate(msr_vals):
+                    totals[pos] += v
+
+
+    # Add total line
+    if len(merged_data) > 1:
+        total_line = [''] * (len(line) - len(msr_vals))
+        total_line.extend(m.format(v, type=format_type) \
+                          for m, v in zip(cycle(measures), totals))
+    else:
+        total_line = None
+
     # Construct columns metadata
     cols = build_headers(spc, regular_coords)
     pivot_cols = build_headers(spc, [pivot_coords[0]], force_parent='')
@@ -265,7 +302,11 @@ def dice(coordinates, measures, **options):
             'parent': m['label'],
         } for m in msr_cols)
 
-    return merged_data, cols
+    return {
+        'data': merged_data,
+        'columns': cols,
+        'totals': total_line,
+    }
 
 
 def dice_by_msr(coordinates, measures, filters=None):

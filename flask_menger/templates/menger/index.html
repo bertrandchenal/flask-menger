@@ -84,11 +84,19 @@
               <th data-bind="text: label, css: type"></th>
             </tr>
           </thead>
+
           <tbody data-bind="foreach: {data: get_data, as: 'line'}">
             <tr data-bind="foreach: $parent.columns">
               <td data-bind="text: line[$index()], css: type"></td>
             </tr>
           </tbody>
+
+          <tfoot>
+            <tr data-bind="foreach: totals" class="totals">
+              <td data-bind="text: $data"></td>
+            </tr>
+          </tfoot>
+
         </table>
       </div>
     </div>

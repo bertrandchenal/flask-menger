@@ -376,6 +376,7 @@ var DataSet = function(json_state) {
     this.data = ko.observable();
     this.limit = ko.observable(PAGE_LENGTH);
     this.columns = ko.observable([]);
+    this.totals = ko.observable([]);
     this.json_state = ko.observable();
     this.state = {};
     this.ready = ko.observable(false);
@@ -670,6 +671,7 @@ DataSet.prototype.fetch_data = function(mime) {
     if (res && !mime) {
         this.data(res.data);
         this.columns(res.columns);
+        this.totals(res.totals);
         return;
     }
     var url = '/mng/dice.' + (mime || 'json') + '?' +  $.param({'query': json_state});;
@@ -690,6 +692,7 @@ DataSet.prototype.set_data = function(json_state, res) {
     DATA_CACHE[json_state] = res;
     this.data(res.data);
     this.columns(res.columns);
+    this.totals(res.totals);
 };
 
 DataSet.prototype.get_xlsx = function() {

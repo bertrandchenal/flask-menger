@@ -27,6 +27,11 @@ td.measure, th.measure {
     text-align: right;
 }
 
+.totals td {
+    text-align: right;
+    font-weight: bold;
+}
+
 .left-menu {
     padding-bottom: 1em;
     -webkit-touch-callout: none;
