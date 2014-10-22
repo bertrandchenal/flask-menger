@@ -130,6 +130,7 @@ def dice(coordinates, measures, **options):
     while pivot_name in regular_names:
         regular_names.remove(pivot_name)
 
+    # Build measures
     msr_cols = []
     for m in measures:
         sname = m.split('.')[0]
@@ -167,7 +168,11 @@ def dice(coordinates, measures, **options):
     # split coordinates and get pivot values depth
     depth = None
     pivot_coords = []
-    regular_coords = [d for d in coordinates if d[0] in regular_names]
+    regular_coords = []
+    coord_dict = dict(coordinates)
+    for name in regular_names:
+        regular_coords.append((name, coord_dict[name]))
+
     for d in coordinates:
         name, vals = d
         if name != pivot_name:
@@ -329,4 +334,3 @@ def build_xlsx(res):
     out = os.path.join(mkdtemp(), 'result.xlsx')
     wb.save(out)
     return out
-
