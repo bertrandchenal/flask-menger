@@ -1,9 +1,10 @@
 import datetime
+from hashlib import md5
 
 from flask import (current_app, Blueprint, render_template, request, json,
                    send_file)
 from flask.ext.login import login_required
-from menger import connect, get_space, iter_spaces
+from menger import connect, get_space, iter_spaces, register
 
 from flask_menger.web import build_xlsx, dice
 
@@ -11,16 +12,47 @@ menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
 
-def sorter(order):
-    def wrapped(el):
-        name = el['name']
-        return order.index(name)
-    return wrapped
+
+class LRU:
+
+    def __init__(self, size=1000):
+        self.fresh = {}
+        self.stale = {}
+        self.size = size
+
+    def get(self, key, default=None):
+        if key in self.fresh:
+            return self.fresh[key]
+
+        if key in self.stale:
+            value = self.stale[key]
+            # Promote key to fresh dict
+            self.set(key, value)
+            return value
+        return default
+
+    def clean(self, partial=False):
+        if partial:
+            # Discard only stale data
+            self.stale = self.fresh
+            self.fresh = {}
+            return
+
+        # Full clean
+        self.stale = {}
+        self.fresh = {}
+
+    def set(self, key, value):
+        self.fresh[key] = value
+        if len(self.fresh) > self.size:
+            self.clean(partial=True)
+
+QUERY_CACHE = LRU()
+register('load', QUERY_CACHE.clean)
 
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
 @login_required
 def mng(method, ext):
-    res = {}
     get_permission = current_app.config.get('MENGER_FILTER')
     if get_permission:
         filters = get_permission()
@@ -47,8 +79,21 @@ def mng(method, ext):
 
         return json.jsonify(spaces=spaces)
 
-    query = json.loads(request.args.get('query', '{}'))
+    raw_query = request.args.get('query', '{}')
+    query = json.loads(raw_query)
 
+    # Build unique id for query
+    h = md5(raw_query.encode())
+    if filters:
+        filters_str = str(sorted(filters.items())).decode()
+        h.update(filters_str)
+    qid = h.hexdigest()
+
+    cached_value = QUERY_CACHE.get(qid)
+    if cached_value is not None:
+        return cached_value
+
+    res = {}
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
             spc_name = query.get('space')
@@ -82,7 +127,9 @@ def mng(method, ext):
     if ext != 'json':
         return 'Unknown extension "%s"' % ext, 404
 
-    return json.jsonify(**res)
+    json_res = json.jsonify(**res)
+    QUERY_CACHE.set(qid, json_res)
+    return json_res
 
 
 @menger_app.route('/')

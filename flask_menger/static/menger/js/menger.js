@@ -2,6 +2,8 @@
 
 var DIM_CACHE = {};
 var DATA_CACHE = {};
+var DATA_CACHE_KEYS = [];
+var MAX_DATA = 10;
 var DRILL_CACHE = {};
 var PAGE_LENGTH = 100;
 
@@ -684,12 +686,19 @@ DataSet.prototype.fetch_data = function(mime) {
 };
 
 DataSet.prototype.set_data = function(json_state, res) {
-    var msr_names = this.measures().map(function(m) {
-        return m.name;
-    });
-    var columns = res.columns;
     // Store in cache
+    var is_new = !(json_state in DATA_CACHE);
     DATA_CACHE[json_state] = res;
+    if (is_new) {
+        DATA_CACHE_KEYS.push(json_state);
+    }
+    // Discard oldest items if dict gets too big
+    if (DATA_CACHE_KEYS.length > MAX_DATA) {
+        var discard = DATA_CACHE_KEYS.shift();
+        delete DATA_CACHE[discard]
+    }
+
+    // Update dataset
     this.data(res.data);
     this.columns(res.columns);
     this.totals(res.totals);
