@@ -85,7 +85,7 @@ def mng(method, ext):
     # Build unique id for query
     h = md5(raw_query.encode())
     if filters:
-        filters_str = str(sorted(filters.items())).decode()
+        filters_str = str(sorted(filters.items())).encode()
         h.update(filters_str)
     qid = h.hexdigest()
 
