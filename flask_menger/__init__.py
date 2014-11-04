@@ -79,11 +79,8 @@ def mng(method, ext):
 
         return json.jsonify(spaces=spaces)
 
-    raw_query = request.args.get('query', '{}')
-    query = json.loads(raw_query)
-
     # Build unique id for query
-    h = md5(raw_query.encode())
+    h = md5(request.url.encode())
     if filters:
         filters_str = str(sorted(filters.items())).encode()
         h.update(filters_str)
@@ -92,6 +89,9 @@ def mng(method, ext):
     cached_value = QUERY_CACHE.get(qid)
     if cached_value is not None:
         return cached_value
+
+    raw_query = request.args.get('query', '{}')
+    query = json.loads(raw_query)
 
     res = {}
     if method == 'drill':
@@ -109,7 +109,8 @@ def mng(method, ext):
             value = tuple(query.get('value', []))
             data = list(dim.drill(value))
             offset = len(value)
-            mk_label = lambda x: dim.format(value + (x,), offset=offset)
+            mk_label = lambda x: dim.format(value + (x,), fmt_type='txt',
+                                            offset=offset)
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
@@ -124,7 +125,7 @@ def mng(method, ext):
     else:
         return ('Unknown method "%s"' % method, 404)
 
-    if ext != 'json':
+    if ext not in ('json', 'txt'):
         return 'Unknown extension "%s"' % ext, 404
 
     json_res = json.jsonify(**res)
@@ -140,7 +141,6 @@ def home():
 
 def do_dice(query, filters, ext):
     res = {}
-    format_type = 'xlsx' if ext == 'xlsx' else None
     dimensions = query.get('dimensions', [])
     for d in dimensions:
         d[1] = tuple(d[1] or [])
@@ -152,7 +152,7 @@ def do_dice(query, filters, ext):
     skip_zero = query.get('skip_zero')
     with connect(current_app.config['MENGER_DATABASE']):
         return dice(dimensions, measures,
-                             format_type=format_type,
+                             format_type=ext,
                              filters=filters, skip_zero=skip_zero)
 
 def compute_filename(pattern):

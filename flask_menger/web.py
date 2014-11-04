@@ -9,6 +9,7 @@ from menger import Dimension, Measure, get_space
 
 logger = logging.getLogger('menger.flask')
 not_none = lambda x: x is not None
+is_none = lambda x: x is None
 
 
 def get_label(space, name, value):
@@ -16,7 +17,7 @@ def get_label(space, name, value):
     dim = get_dimension(space, name)
     if not value:
         return dim.label
-    return "%s: %s" % (dim.label, dim.format(value))
+    return "%s: %s" % (dim.label, dim.format(value, fmt_type='txt'))
 
 
 def get_dimension(space, name):
@@ -48,7 +49,19 @@ def get_measure(name):
 
     return msr
 
-def build_line(dimensions, key, coordinates, type=type):
+
+def build_line(dimensions, key, coordinates, fmt_type=None):
+    if fmt_type == 'json':
+        line = []
+        for dim, values, coord in zip(dimensions, key, coordinates):
+            coord_name, coord_tuple = coord
+            # Frozen dimension are ignored
+            if None not in coord_tuple:
+                continue
+            offset = len(get_head(coord_tuple))
+            line.append(dim.format(values, offset=offset, fmt_type=fmt_type))
+        return line
+
     line = []
     for dim, values, coord in zip(dimensions, key, coordinates):
         coord_name, coord_tuple = coord
@@ -56,13 +69,13 @@ def build_line(dimensions, key, coordinates, type=type):
         if None not in coord_tuple:
             offset = len(values) - 1
             val = [None] * offset + [values[-1]]
-            line.append(dim.format(val, offset=offset, type=type))
+            line.append(dim.format(val, offset=offset, fmt_type=fmt_type))
             continue
 
         for pos, value in enumerate(values):
             if coord_tuple[pos] is None:
                 value = [None] * pos + [value]
-                line.append(dim.format(value, offset=pos, type=type))
+                line.append(dim.format(value, offset=pos, fmt_type=fmt_type))
 
     return line
 
@@ -145,7 +158,7 @@ def dice(coordinates, measures, **options):
         })
 
     # No pivot, return regular output
-    if not pivot_name:
+    if True: #not pivot_name
         dim_cols = build_headers(spc, coordinates)
         data_dict = dice_by_msr(coordinates, measures, filters=filters)
         d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
@@ -153,6 +166,7 @@ def dice(coordinates, measures, **options):
         dimensions = [get_dimension(spc, d) for d, v in coordinates]
         measures = [get_measure(m) for m in measures]
         totals = None
+
         for key in product(*d_drills):
             values = data_dict.get(key, [])
             # Skip zeros if asked
@@ -160,8 +174,9 @@ def dice(coordinates, measures, **options):
                 continue
 
             values = data_dict[key]
-            line = build_line(dimensions, key, coordinates, type=format_type)
-            line.extend(m.format(v, type=format_type) \
+            line = build_line(dimensions, key, coordinates,
+                              fmt_type=format_type)
+            line.extend(m.format(v, fmt_type=format_type) \
                         for m, v in zip(measures, values))
             data.append(line)
 
@@ -175,7 +190,7 @@ def dice(coordinates, measures, **options):
         # Add total line
         if len(data) > 1:
             total_line = [''] * len(dim_cols)
-            total_line.extend(m.format(v, type=format_type) \
+            total_line.extend(m.format(v, fmt_type=format_type) \
                               for m, v in zip(measures, totals))
         else:
             total_line = None
@@ -253,19 +268,19 @@ def dice(coordinates, measures, **options):
 
             # Fill line with regular coordinates
             line = build_line(reg_dims, base_key, regular_coords,
-                              type=format_type)
+                              fmt_type=format_type)
 
             # Add pivot dimensions to line
             for pos, head in enumerate(pivot_heads):
                 if pos == 0:
                     line.extend(
                         build_line([pivot_dim], [head+tail], pivot_coords,
-                                   type=format_type)
+                                   fmt_type=format_type)
                     )
 
             # Append measures
             line.extend(
-                m.format(v, type=format_type) \
+                m.format(v, fmt_type=format_type) \
                 for m, v in zip(cycle(measures), msr_vals)
             )
 
@@ -283,7 +298,7 @@ def dice(coordinates, measures, **options):
     # Add total line
     if len(merged_data) > 1:
         total_line = [''] * (len(line) - len(msr_vals))
-        total_line.extend(m.format(v, type=format_type) \
+        total_line.extend(m.format(v, fmt_type=format_type) \
                           for m, v in zip(cycle(measures), totals))
     else:
         total_line = None
@@ -294,7 +309,7 @@ def dice(coordinates, measures, **options):
     cols.extend(pivot_cols)
 
     for head in pivot_heads:
-        prefix = pivot_dim.format(head, type=format_type)
+        prefix = pivot_dim.format(head, fmt_type=format_type)
         cols.extend({
             'label': prefix,
             'type': 'measure',

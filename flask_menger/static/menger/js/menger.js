@@ -375,7 +375,8 @@ var DataSet = function(json_state) {
     this.available_measures = ko.observable([]);
     this.dim_selects = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
-    this.data = ko.observable();
+    this.table_data = ko.observable();
+    this.graph_data = ko.observable();
     this.limit = ko.observable(PAGE_LENGTH);
     this.columns = ko.observable([]);
     this.totals = ko.observable([]);
@@ -397,15 +398,16 @@ var DataSet = function(json_state) {
         'rateLimit': 10,
     });
 
+    // get_data returns slice of data that increase with this.limit()
     this.get_data = ko.computed(function() {
-        var res = this.data();
+        var res = this.table_data();
         if (res && res.length > this.limit()) {
             return res.slice(0, this.limit());
         }
         return res;
     }, this);
 
-    this.data.subscribe(function() {
+    this.table_data.subscribe(function() {
         this.limit(PAGE_LENGTH);
     }, this);
 
@@ -414,7 +416,7 @@ var DataSet = function(json_state) {
         var full_height = document.body.offsetHeight;
         var position = window.innerHeight + window.scrollY;
         var near_bottom = position >= full_height * 0.9;
-        if (this.data() && near_bottom && this.data().length > this.limit()) {
+        if (this.table_data() && near_bottom && this.table_data().length > this.limit()) {
             this.limit(this.limit() + PAGE_LENGTH);
         }
     }.bind(this);
@@ -664,28 +666,59 @@ DataSet.prototype.refresh_state = function() {
     if (window.location.hash != hash) {
         window.history.pushState(this.json_state(), "Title", hash);
     }
-    this.fetch_data();
+
+    var active_view = 'table';
+    var ext = 'txt';
+    // active_view = 'graph';
+    // ext = 'json';
+    var url = this.dice_url(ext);
+    var prm = this.fetch_data(url);
+    prm.then(function(res) {
+        this.cache_data(url, res);
+        if (active_view == 'table') {
+            // Update dataset
+            this.table_data(res.data);
+            this.columns(res.columns);
+            this.totals(res.totals);
+        } else if (active_view == 'graph') {
+            for (var pos in res.data) {
+                var date = res.data[pos][0];
+                if (typeof date != 'object') {
+                    continue
+                }
+                res.data[pos][0] = new Date(date[0], date[1]-1, date[1]);
+            }
+
+            var spec = SPEC4;
+            spec.data[0].values = res.data;
+            plot(spec)
+        }
+    }.bind(this));
 };
 
-DataSet.prototype.fetch_data = function(mime) {
-    var json_state = this.json_state()
-    var res = DATA_CACHE[json_state];
-    if (res && !mime) {
-        this.data(res.data);
-        this.columns(res.columns);
-        this.totals(res.totals);
-        return;
-    }
-    var url = '/mng/dice.' + (mime || 'json') + '?' +  $.param({'query': json_state});;
-    if (mime) {
-        window.location.href = url;
 
+function plot(spec) {
+    vg.parse.spec(spec, function(chart) { chart({el:"#graphs"}).update(); });
+}
+
+
+
+DataSet.prototype.dice_url = function(ext) {
+    return '/mng/dice.' + ext + '?' +  $.param({'query': this.json_state()});
+}
+
+
+DataSet.prototype.fetch_data = function(url) {
+    var res = DATA_CACHE[url];
+    if (res) {
+        return $.when(res);
     } else {
-        $.ajax(url).then(this.set_data.bind(this, json_state))
+        return $.ajax(url);
     }
 };
 
-DataSet.prototype.set_data = function(json_state, res) {
+
+DataSet.prototype.cache_data = function(json_state, res) {
     // Store in cache
     var is_new = !(json_state in DATA_CACHE);
     DATA_CACHE[json_state] = res;
@@ -697,15 +730,10 @@ DataSet.prototype.set_data = function(json_state, res) {
         var discard = DATA_CACHE_KEYS.shift();
         delete DATA_CACHE[discard]
     }
-
-    // Update dataset
-    this.data(res.data);
-    this.columns(res.columns);
-    this.totals(res.totals);
 };
 
 DataSet.prototype.get_xlsx = function() {
-    this.fetch_data('xlsx');
+        window.location.href = url;
 };
 
 
@@ -718,6 +746,362 @@ var get_state = function() {
     }
 }
 
+
+var SPEC = {
+    "width": 400,
+    "height": 200,
+    "data": [
+        {
+            "name": "table"
+        },
+    ],
+    "scales": [
+        {"name":"x",
+         "type":"ordinal",
+         "range":"width",
+         "domain":{"data":"table", "field":"data.0"}},
+        {"name":"y",
+         "range":"height",
+         "nice":true,
+         "domain":{"data":"table", "field":"data.1"}},
+        {"name": "color",
+         "type": "ordinal",
+         "range": "category10"
+        }
+    ],
+    "axes": [
+        {
+            "type":"x",
+            "scale":"x",
+            "properties": {
+                "labels": {
+                    "angle": {"value": -30},
+                    "fontSize": {"value": 12},
+                    "align": {"value": "right"},
+                    "baseline": {"value": "middle"},
+                    "dx": {"value": -3}
+                }
+            }
+        },
+        {
+            "type":"y",
+            "scale":"y"
+        }
+    ],
+    "marks": [
+        {
+            "type": "rect",
+            "from": {"data":"table"},
+            "properties": {
+                "enter": {
+                    "x": {"scale":"x", "field":"data.0"},
+                    "width": {"scale":"x", "band":true, "offset":-1},
+                    "y": {"scale":"y", "field":"data.1"},
+                    "y2": {"scale":"y", "value":0},
+                    "fill": {"scale": "color", "field": "data.0"},
+                },
+                "update": {
+                    "fillOpacity": {"value": 0.5}
+                },
+                "hover": {
+                    "fillOpacity": {"value": 1}}
+            }
+        }
+    ],
+    "legends": [
+        {
+            "fill": "color",
+            "title": "Legend",
+            "properties": {
+                "title": {
+                    "fontSize": {"value": 14}
+                },
+                "labels": {
+                    "fontSize": {"value": 12}
+                },
+                "symbols": {
+                    "stroke": {"value": "transparent"}
+                },
+            }
+        }
+    ]
+}
+
+var SPEC2 = {
+    "width": 500,
+    "height": 200,
+    "data": [
+        {
+            "name": "table",
+            "values": []
+        },
+        {
+            "name": "stats",
+            "source": "table",
+            "transform": [
+                {"type": "facet", "keys": ["data.0"]},
+                {"type": "stats", "value": "data.2"}
+            ]
+        }
+    ],
+    "scales": [
+        {
+            "name": "x",
+            "type": "ordinal",
+            "range": "width",
+            "domain": {"data": "table", "field": "data.0"}
+        },
+        {
+            "name": "y",
+            "range": "height",
+            "nice": true,
+            "domain": {"data": "stats", "field": "sum"}
+        },
+        {
+            "name": "color",
+            "type": "ordinal",
+            "domain": {"data": "table", "field": "data.1"},
+            "range": "category20"
+        }
+    ],
+    "axes": [
+        {
+            "type": "x",
+            "scale": "x",
+            "properties": {
+                "labels": {
+                    "angle": {"value": -30},
+                    "fontSize": {"value": 12},
+                    "align": {"value": "right"},
+                    "baseline": {"value": "middle"},
+                    "dx": {"value": -3}
+                }
+            }
+        },
+        {
+            "type": "y",
+            "scale": "y"
+        }
+    ],
+    "marks": [
+        {
+            "type": "group",
+            "from": {
+                "data": "table",
+                "transform": [
+                    {"type": "facet", "keys": ["data.1"]},
+                    {"type": "stack", "point": "data.0", "height": "data.2"}
+                ]
+            },
+            "marks": [
+                {
+                    "type": "rect",
+                    "properties": {
+                        "enter": {
+                            "x": {"scale": "x", "field": "data.0"},
+                            "width": {"scale": "x", "band": true, "offset": -1},
+                            "y": {"scale": "y", "field": "y"},
+                            "y2": {"scale": "y", "field": "y2"},
+                            "fill": {"scale": "color", "field": "data.1"}
+                        },
+                        "update": {
+                            "fillOpacity": {"value": 1}
+                        },
+                        "hover": {
+                            "fillOpacity": {"value": 0.5}
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+
+    "legends": [
+        {
+            "fill": "color",
+            "title": "Legend",
+            "offset": 0,
+            "properties": {
+                "title": {
+                    "fontSize": {"value": 14}
+                },
+                "labels": {
+                    "fontSize": {"value": 12}
+                },
+                "symbols": {
+                    "stroke": {"value": "transparent"}
+                },
+            }
+        }
+    ]
+};
+
+var SPEC3 = {
+    "width": 500,
+    "height": 200,
+    "data": [
+        {
+            "name": "table",
+            "format": {"type":"json", "parse":{"0":"date"}}
+        }
+    ],
+    "scales": [
+        {
+            "name": "x",
+            "type": "time",
+            "range": "width",
+            "domain": {"data": "table", "field": "data.0"}
+        },
+        {
+            "name": "y",
+            "type": "linear",
+            "range": "height",
+            "nice": true,
+            "domain": {"data": "table", "field": "data.2"}
+        },
+        {
+            "name": "color", "type": "ordinal", "range": "category10"
+        }
+    ],
+    "axes": [
+        {"type": "x", "scale": "x", "tickSizeEnd": 0},
+        {"type": "y", "scale": "y"}
+    ],
+    "marks": [
+        {
+            "type": "group",
+            "from": {
+                "data": "table",
+                "transform": [{"type": "facet", "keys": ["data.1"]}]
+            },
+            "marks": [
+                {
+                    "type": "line",
+                    "properties": {
+                        "enter": {
+                            "x": {"scale": "x", "field": "data.0"},
+                            "y": {"scale": "y", "field": "data.2"},
+                            "stroke": {"scale": "color", "field": "data.1"},
+                            "strokeWidth": {"value": 2}
+                        }
+                    }
+                },
+                {
+                    "type": "text",
+                    "from": {
+                        "transform": [{
+                            "type": "filter",
+                            "test": "index==data.length-1"
+                        }]
+                    },
+                    "properties": {
+                        "enter": {
+                            "x": {"scale": "x", "field": "data.0", "offset": 2},
+                            "y": {"scale": "y", "field": "data.2"},
+                            "fill": {"scale": "color", "field": "data.1"},
+                            "text": {"field": "data.1"},
+                            "baseline": {"value": "middle"}
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+};
+
+var SPEC4 = {
+    "width": 500,
+    "height": 200,
+    "data": [
+        {
+            "name": "table",
+            "format": {"type":"json", "parse":{"0":"date"}},
+        },
+        {
+            "name": "stats",
+            "source": "table",
+            "transform": [
+                {"type": "facet", "keys": ["data.0"]},
+                {"type": "stats", "value": "data.2"}
+            ]
+        }
+    ],
+    "scales": [
+        {
+            "name": "x",
+            "type": "time",
+            "range": "width",
+            "zero": false,
+            "domain": {"data": "table", "field": "data.0"}
+        },
+        {
+            "name": "y",
+            "type": "linear",
+            "range": "height",
+            "nice": true,
+            "domain": {"data": "stats", "field": "sum"}
+        },
+        {
+            "name": "color",
+            "type": "ordinal",
+            "range": "category10"
+        }
+    ],
+    "axes": [
+        {"type": "x", "scale": "x"},
+        {"type": "y", "scale": "y"}
+    ],
+    "marks": [
+        {
+            "type": "group",
+            "from": {
+                "data": "table",
+                "transform": [
+                    {"type": "facet", "keys": ["data.1"]},
+                    {"type": "stack", "point": "data.0", "height": "data.2"}
+                ]
+            },
+            "marks": [
+                {
+                    "type": "area",
+                    "properties": {
+                        "enter": {
+                            "interpolate": {"value": "monotone"},
+                            "x": {"scale": "x", "field": "data.0"},
+                            "y": {"scale": "y", "field": "y"},
+                            "y2": {"scale": "y", "field": "y2"},
+                            "fill": {"scale": "color", "field": "data.1"}
+                        },
+                        "update": {
+                            "fillOpacity": {"value": 1}
+                        },
+                        "hover": {
+                            "fillOpacity": {"value": 0.5}
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "legends": [
+        {
+            "fill": "color",
+            "title": "Legend",
+            "properties": {
+                "title": {
+                    "fontSize": {"value": 14}
+                },
+                "labels": {
+                    "fontSize": {"value": 12}
+                },
+                "symbols": {
+                    "stroke": {"value": "transparent"}
+                },
+            }
+        }
+    ]
+};
+
 var init = function() {
     var json_state = get_state();
     var ds = new DataSet(json_state);
@@ -726,6 +1110,7 @@ var init = function() {
     }.bind(this);
 
     ko.applyBindings(ds, $('body')[0]);
+
 };
 
 $(init);

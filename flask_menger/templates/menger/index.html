@@ -10,6 +10,9 @@
 <script src="{{url_for('menger.static', filename='js/jquery-1.11.1.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/bootstrap.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/knockout-3.1.0.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/knockout-3.1.0.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/d3.v3.min.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/vega.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
 {% endblock %}
 
@@ -72,35 +75,57 @@
     </div>
   </div>
 
+
+
   <div class="col-md-9 col-sm-9">
+
+
     <div class="panel panel-default">
+      <!-- <div class="panel-heading"> -->
+      <!--   <ul class="nav nav-pills"> -->
+      <!--     <li class="active"> -->
+      <!--       <a href="#table" data-toggle="tab">Table</a> -->
+      <!--     </li> -->
+      <!--     <li class=""> -->
+      <!--       <a href="#graphs" data-toggle="tab">Graphs</a> -->
+      <!--     </li> -->
+      <!--   </ul> -->
+      <!-- </div> <\!-- /.panel-heading -\-> -->
+
       <div class="panel-body">
-        <table class="table table-hover">
-          <thead>
-            <tr data-bind="foreach: columns_headers">
-              <th data-bind="text: name, attr: {'colspan': colspan}"></th>
-            </tr>
-            <tr data-bind="foreach: columns">
-              <th data-bind="text: label, css: type"></th>
-            </tr>
-          </thead>
 
-          <tbody data-bind="foreach: {data: get_data, as: 'line'}">
-            <tr data-bind="foreach: $parent.columns">
-              <td data-bind="text: line[$index()], css: type"></td>
-            </tr>
-          </tbody>
+        <div class="tab-content" style="overflow-x: auto">
+          <div class="tab-pane active" id="table">
+            <table class="table table-hover">
+              <thead>
+                <tr data-bind="foreach: columns_headers">
+                  <th data-bind="text: name, attr: {'colspan': colspan}"></th>
+                </tr>
+                <tr data-bind="foreach: columns">
+                  <th data-bind="text: label, css: type"></th>
+                </tr>
+              </thead>
 
-          <tfoot>
-            <tr data-bind="foreach: totals" class="totals">
-              <td data-bind="text: $data"></td>
-            </tr>
-          </tfoot>
+              <tbody data-bind="foreach: {data: get_data, as: 'line'}">
+                <tr data-bind="foreach: $parent.columns">
+                  <td data-bind="text: line[$index()], css: type"></td>
+                </tr>
+              </tbody>
 
-        </table>
-      </div>
-    </div>
-  </div>
+              <tfoot>
+                <tr data-bind="foreach: totals" class="totals">
+                  <td data-bind="text: $data"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div> <!-- /#table -->
+          <div class="tab-pane" id="graphs">
+          </div><!-- /#graph -->
+        </div> <!-- /.tab-content -->
+
+      </div> <!-- /.panel-body -->
+    </div> <!-- /.panel -->
+  </div> <!-- /.col -->
 
 </div> <!-- /.row -->
 {% endblock %}
