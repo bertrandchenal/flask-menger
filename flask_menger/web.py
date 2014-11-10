@@ -1,5 +1,5 @@
 from collections import defaultdict
-from itertools import groupby, product, takewhile, cycle
+from itertools import groupby, product, takewhile, dropwhile, cycle
 import logging
 import os
 from tempfile import mkdtemp
@@ -36,6 +36,34 @@ def get_head(values):
     """
     return tuple(takewhile(not_none, values))
 
+def get_tail(values):
+    """
+    Return a tuple of the first non-None items in values list
+    """
+    return tuple(dropwhile(is_none, values))
+
+def mask(values, mask):
+    '''
+    Apply mask on each item:
+    ex: [(2014, 1), (2014, 2)], (None,) -> [(None, 1), (None, 2)]
+    '''
+    cut = len(mask)
+    for item in values:
+        yield mask + item[cut:]
+
+def patch(key, coordinates, to_patch):
+    '''
+    Fill missing slot on the key
+    '''
+    for pos, item in enumerate(key):
+        if pos not in to_patch:
+            yield item
+            continue
+        # Compute position of the mask
+        i = to_patch[pos]
+        mask = key[i]
+        cut = len(mask)
+        yield mask + item[cut:]
 
 def get_measure(name):
     space_name, name = name.split('.')
@@ -73,6 +101,8 @@ def build_line(dimensions, key, coordinates, fmt_type=None):
             continue
 
         for pos, value in enumerate(values):
+            if value is None:
+                continue
             if coord_tuple[pos] is None:
                 value = [None] * pos + [value]
                 line.append(dim.format(value, offset=pos, fmt_type=fmt_type))
@@ -80,17 +110,14 @@ def build_line(dimensions, key, coordinates, fmt_type=None):
     return line
 
 
-def build_headers(spc, coordinates, force_parent=None):
+def build_headers(spc, reg_coords, to_patch, all_coordinates):
     headers = []
-    for coord_name, coord_tuple in coordinates:
+    for coord_pos, (coord_name, coord_tuple) in enumerate(reg_coords):
         dim = get_dimension(spc, coord_name)
         # Frozen dimension: we only show one column
         if None not in coord_tuple:
             label = dim.levels[len(coord_tuple) - 1]
-            if force_parent is  None:
-                parent = get_label(spc, coord_name, coord_tuple[:-1])
-            else:
-                parent = force_parent
+            parent = get_label(spc, coord_name, coord_tuple[:-1])
 
             headers.append({
                 'label': label,
@@ -99,14 +126,22 @@ def build_headers(spc, coordinates, force_parent=None):
             })
             continue
 
+        # If the current coordinate is patched, we hide corresponding
+        # columns
+        cut = None
+        if coord_pos in to_patch:
+            pdim, pvals = all_coordinates[to_patch[coord_pos]]
+            head = get_head(pvals)
+            cut = len(head)
+
         for pos, value in enumerate(coord_tuple):
             if value is not None:
                 continue
+            if cut is not None and pos <= cut:
+                continue
+
             label = dim.levels[pos]
-            if force_parent is  None:
-                parent = get_label(spc, coord_name, coord_tuple)
-            else:
-                parent = force_parent
+            parent = get_label(spc, coord_name, coord_tuple)
 
             headers.append({
                 'label': label,
@@ -122,6 +157,10 @@ def dice(coordinates, measures, **options):
     format_type = options.get('format_type')
     filters = options.get('filters')
     skip_zero = options.get('skip_zero')
+    if format_type == 'txt':
+        pivot_on = options.get('pivot_on', [])
+    else:
+        pivot_on = []
 
     # Get space
     spc_name = measures[0].split('.')[0]
@@ -129,197 +168,101 @@ def dice(coordinates, measures, **options):
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
-    # Search for a pivot
-    pivot_name = None
-    regular_names = []
-    for name, _ in coordinates:
-        if name in regular_names:
-            if pivot_name and pivot_name != name:
-                # Double pivot not supported
+    # Split coordinates into regular and pivot coordinates
+    reg_coords = [c for i, c in enumerate(coordinates) if i not in pivot_on]
+    piv_coords = [coordinates[i] for i in pivot_on]
+
+    # Recombine them
+    coordinates = reg_coords + piv_coords
+    dimensions = [get_dimension(spc, d) for d, v in coordinates]
+
+    # Query DB
+    data_dict = dice_by_msr(coordinates, measures, filters=filters)
+    drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
+
+    # Apply mask on values if the same dimension is on both in
+    # the regular set and the pivot set
+    to_patch = {}
+    for i, (idim, ivals) in enumerate(coordinates):
+        for j, (jdim, jvals) in enumerate(coordinates):
+            if idim != jdim:
                 continue
-            pivot_name = name
-        else:
-            regular_names.append(name)
+            if len(jvals) >= len(ivals):
+                continue
 
-    # clean regular_names
-    while pivot_name in regular_names:
-        regular_names.remove(pivot_name)
+            # Apply mask on drills and filter doubles
+            drills[i] = sorted(set(mask(drills[i], jvals)))
+            to_patch[i] = j
 
-    # Build measures
+    # Split dimensions and drills in both groups
+    reg_dims = dimensions[:len(reg_coords)]
+    piv_dims = dimensions[len(reg_coords):]
+    reg_drills = drills[:len(reg_coords)]
+    piv_drills = drills[len(reg_coords):]
+
+    # Create columns definition
+    reg_cols = build_headers(spc, reg_coords, to_patch, coordinates)
     msr_cols = []
-    for m in measures:
-        sname = m.split('.')[0]
-        s = get_space(sname)
-        msr = get_measure(m)
-        msr_cols.append({
-            'label': s._label + '/' + msr.label,
-            'type': 'measure',
-            'name': msr.name,
-        })
+    for piv_key in product(*piv_drills):
+        dim_names = []
+        for d, v in zip(piv_dims, piv_key):
+            tail = get_tail(v)
+            offset = len(v) - len(tail)
+            n = d.format(v, offset=offset, fmt_type=format_type)
+            dim_names.append(n)
 
-    # No pivot, return regular output
-    if True: #not pivot_name
-        dim_cols = build_headers(spc, coordinates)
-        data_dict = dice_by_msr(coordinates, measures, filters=filters)
-        d_drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
-        data = []
-        dimensions = [get_dimension(spc, d) for d, v in coordinates]
-        measures = [get_measure(m) for m in measures]
-        totals = None
+        for m in measures:
+            space_name, name = m.split('.')
+            msr = get_measure(m)
+            space = get_space(space_name)
 
-        for key in product(*d_drills):
-            values = data_dict.get(key, [])
-            # Skip zeros if asked
-            if skip_zero and not any(values):
-                continue
+            msr_cols.append({
+                'label': space._label + '/' + msr.label,
+                'type': 'measure',
+                'name': msr.name,
+                'parent':  '|'.join(dim_names),
+            })
 
-            values = data_dict[key]
-            line = build_line(dimensions, key, coordinates,
-                              fmt_type=format_type)
-            line.extend(m.format(v, fmt_type=format_type) \
-                        for m, v in zip(measures, values))
-            data.append(line)
-
-            # Aggregate totals
-            if totals is None:
-                totals = values
-            else:
-                for pos, v in enumerate(values):
-                    totals[pos] += v
-
-        # Add total line
-        if len(data) > 1:
-            total_line = [''] * len(dim_cols)
-            total_line.extend(m.format(v, fmt_type=format_type) \
-                              for m, v in zip(measures, totals))
-        else:
-            total_line = None
-
-        return {
-            'data': data,
-            'columns': dim_cols + msr_cols,
-            'totals': total_line,
-        }
-
-    pivot_dim = get_dimension(spc, pivot_name)
-    # split coordinates and get pivot values depth
-    depth = None
-    totals = None
-    pivot_coords = []
-    regular_coords = []
-    coord_dict = dict(coordinates)
-    for name in regular_names:
-        regular_coords.append((name, coord_dict[name]))
-
-    for d in coordinates:
-        name, vals = d
-        if name != pivot_name:
-            continue
-        if depth is None:
-            depth = len(vals)
-        elif len(vals) != depth:
-            # Values len mismatch on pivot coordinates
-            continue
-        pivot_coords.append(d)
-
-    # Query db for each member of pivot
-    datas = []
-    for c in pivot_coords:
-        data = {}
-        datas.append(
-            dice_by_msr(regular_coords + [c], measures, filters=filters)
-        )
-
-    r_drills = [get_dimension(spc, d).glob(v) for d, v in regular_coords]
-    pivot_heads = []
-    pivot_tails = set()
-    for c, v in pivot_coords:
-        head = get_head(v)
-        # Ignore mal-constructed pivot coordinates
-        if pivot_heads and len(pivot_heads[-1]) != len(head):
-            continue
-
-        pivot_heads.append(head)
-        cut = len(head)
-        for child in get_dimension(spc, c).glob(v):
-            pivot_tails.add(child[cut:])
-
-    pivot_tails = sorted(pivot_tails)
-    merged_data = []
-
-    # Prepare dim & measures list for formating
-    reg_dims = [get_dimension(spc, c) for c, v in regular_coords]
+    # Fill data
+    data = []
     measures = [get_measure(m) for m in measures]
+    totals = None
 
-    for base_key in product(*r_drills):
-        for tail in pivot_tails:
+    for reg_key in product(*reg_drills):
+        line = build_line(reg_dims, reg_key, reg_coords,
+                          fmt_type=format_type)
+        values = []
+        for piv_key in product(*piv_drills):
+            key = reg_key + piv_key
+            key = tuple(patch(key, coordinates, to_patch))
+            values.extend(data_dict[key])
 
-            # Build measures
-            msr_vals = []
-            for pos, head in enumerate(pivot_heads):
-                # Add measure values
-                key = base_key + (head + tail,)
-                vals = datas[pos][key]
-                msr_vals.extend(vals)
+        # Skip zeros if asked
+        if skip_zero and not any(values):
+            continue
 
-            # Skip zeros if asked
-            if skip_zero and not any(msr_vals):
-                continue
+        line.extend(m.format(v, fmt_type=format_type) \
+                    for m, v in zip(cycle(measures), values))
+        data.append(line)
 
-            # Fill line with regular coordinates
-            line = build_line(reg_dims, base_key, regular_coords,
-                              fmt_type=format_type)
-
-            # Add pivot dimensions to line
-            for pos, head in enumerate(pivot_heads):
-                if pos == 0:
-                    line.extend(
-                        build_line([pivot_dim], [head+tail], pivot_coords,
-                                   fmt_type=format_type)
-                    )
-
-            # Append measures
-            line.extend(
-                m.format(v, fmt_type=format_type) \
-                for m, v in zip(cycle(measures), msr_vals)
-            )
-
-            # Add line to grand result
-            merged_data.append(line)
-
-            # Aggregate totals
-            if totals is None:
-                totals = msr_vals
-            else:
-                for pos, v in enumerate(msr_vals):
-                    totals[pos] += v
-
+        # Aggregate totals
+        if totals is None:
+            totals = values
+        else:
+            for pos, v in enumerate(values):
+                totals[pos] += v
 
     # Add total line
-    if len(merged_data) > 1:
-        total_line = [''] * (len(line) - len(msr_vals))
+    if len(data) > 1:
+        total_line = [''] * len(reg_cols)
         total_line.extend(m.format(v, fmt_type=format_type) \
                           for m, v in zip(cycle(measures), totals))
     else:
         total_line = None
 
-    # Construct columns metadata
-    cols = build_headers(spc, regular_coords)
-    pivot_cols = build_headers(spc, [pivot_coords[0]], force_parent='')
-    cols.extend(pivot_cols)
-
-    for head in pivot_heads:
-        prefix = pivot_dim.format(head, fmt_type=format_type)
-        cols.extend({
-            'label': prefix,
-            'type': 'measure',
-            'name': m['name'],
-            'parent': m['label'],
-        } for m in msr_cols)
-
     return {
-        'data': merged_data,
-        'columns': cols,
+        'data': data,
+        'columns': reg_cols + msr_cols,
         'totals': total_line,
     }
 

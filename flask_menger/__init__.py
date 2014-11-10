@@ -50,6 +50,11 @@ class LRU:
 QUERY_CACHE = LRU()
 register('load', QUERY_CACHE.clean)
 
+
+# TODO ext should be ony json|xlsx (not text)
+# so the route should be /mng/<type>/<method>.<ext>
+# where type can be 'graph' or 'table'
+
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
 @login_required
 def mng(method, ext):
@@ -150,10 +155,14 @@ def do_dice(query, filters, ext):
         return ('Key "measures" is empty', 404)
 
     skip_zero = query.get('skip_zero')
+    pivot_on = query.get('pivot_on')
     with connect(current_app.config['MENGER_DATABASE']):
         return dice(dimensions, measures,
-                             format_type=ext,
-                             filters=filters, skip_zero=skip_zero)
+                    format_type=ext,
+                    filters=filters,
+                    skip_zero=skip_zero,
+                    pivot_on=pivot_on,
+                )
 
 def compute_filename(pattern):
     now = datetime.datetime.now()

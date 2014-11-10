@@ -198,12 +198,13 @@ Dimension.prototype.get_value = function() {
     return [null];
 };
 
-var DimSelect = function(dataset, dim_name, dim_value) {
+var DimSelect = function(dataset, dim_name, dim_value, pivot) {
     this.dataset = dataset;
     this.selected_dim = ko.observable();
     this.show_options = ko.observable(false);
     this.dimensions = ko.observable();
     this.level_index = ko.observable(0);
+    this.pivot = ko.observable(pivot);
     this.head_levels = ko.observable([]);
     this.tail_levels = ko.observable([]);
     this.prm = this.set_dimensions(
@@ -384,6 +385,8 @@ var DataSet = function(json_state) {
     this.state = {};
     this.ready = ko.observable(false);
     this.skip_zero = ko.observable(true);
+    this.show_menu = ko.observable(true);
+    this.active_view = ko.observable('table');
 
     // fetch meta-data and init state
     $.get('/mng/info.json').then(function(info) {
@@ -392,6 +395,7 @@ var DataSet = function(json_state) {
     }.bind(this));
 
     this.measures.subscribe(this.measures_changed.bind(this));
+
 
     // compute state
     ko.computed(this.refresh_state.bind(this)).extend({
@@ -434,7 +438,7 @@ var DataSet = function(json_state) {
                 continue;
             }
             res.push({
-                'name': name, 'colspan': 1
+                'name': name, 'colspan': 1, 'type': 'group',
             });
         }
 
@@ -445,6 +449,15 @@ var DataSet = function(json_state) {
         return res;
     }.bind(this));
 
+};
+
+DataSet.prototype.toggle_show_menu = function() {
+    this.show_menu(!this.show_menu());
+};
+
+DataSet.prototype.set_active_view = function(obj, ev) {
+    var view = ev.target.href.split('#')[1];
+    this.active_view(view);
 };
 
 DataSet.prototype.push_dim_select = function() {
@@ -526,8 +539,10 @@ DataSet.prototype.set_info = function(info) {
 };
 
 DataSet.prototype.get_dim_selects = function(dims) {
-    return dims.map(function(d) {
-        return new DimSelect(this, d[0], d[1]);
+    var pivot_on = this.state.pivot_on || [];
+    return dims.map(function(d, pos) {
+        var pivot = pivot_on.indexOf(pos) > -1;
+        return new DimSelect(this, d[0], d[1], pivot);
     }.bind(this));
 };
 
@@ -651,6 +666,13 @@ DataSet.prototype.refresh_state = function() {
         return;
     }
 
+    var pivot_on = [];
+    dim_sels.forEach(function(ds, pos) {
+        if (ds.pivot()) {
+            pivot_on.push(pos);
+        }
+    })
+
     this.state = {
         'measures': msrs.map(function(m) {return m.name}),
         'dimensions': dim_sels.map(function(dsel) {
@@ -659,6 +681,7 @@ DataSet.prototype.refresh_state = function() {
             return [dimension.name, value]
         }),
         'skip_zero': this.skip_zero(),
+        'pivot_on': pivot_on,
     }
     this.json_state(JSON.stringify(this.state));
 
@@ -667,20 +690,24 @@ DataSet.prototype.refresh_state = function() {
         window.history.pushState(this.json_state(), "Title", hash);
     }
 
-    var active_view = 'table';
-    var ext = 'txt';
-    // active_view = 'graph';
-    // ext = 'json';
+    var ext = this.active_view() == 'table' ? 'txt' : 'json';
     var url = this.dice_url(ext);
     var prm = this.fetch_data(url);
-    prm.then(function(res) {
-        this.cache_data(url, res);
-        if (active_view == 'table') {
+    if (this.active_view() == 'table') {
+        prm.then(function(res) {
+            this.cache_data(url, res);
             // Update dataset
             this.table_data(res.data);
             this.columns(res.columns);
             this.totals(res.totals);
-        } else if (active_view == 'graph') {
+        }.bind(this));
+    } else if (this.active_view() == 'graph') {
+        var spec = SPEC3;
+        var precise_format = d3.format('.3f');
+        var format = d3.format('.3s');
+        var tip_span = $('#vis_tip');
+        spec.width = this.show_menu() ? 500 : 900;
+        prm.then(function(res) {
             for (var pos in res.data) {
                 var date = res.data[pos][0];
                 if (typeof date != 'object') {
@@ -688,18 +715,30 @@ DataSet.prototype.refresh_state = function() {
                 }
                 res.data[pos][0] = new Date(date[0], date[1]-1, date[1]);
             }
-
-            var spec = SPEC4;
             spec.data[0].values = res.data;
-            plot(spec)
-        }
-    }.bind(this));
+            vg.parse.spec(spec, function(chart) {
+                var view = chart({el:"#vis", renderer: 'svg'}).update();
+                view.on("mouseover", function(event, item) {
+                    if (!item.datum.data.forEach) {
+                        return
+                    }
+                    var content = ''
+                    item.datum.data.forEach(function(item) {
+                        if (item.toPrecision) {
+                            content += format(item);
+                            content += " (" + precise_format(item) + ")";
+                        } else {
+                            content += (item);
+                        }
+                        content += '<br>'
+                    });
+                    tip_span.html(content);
+
+                }).update();
+            });
+        }.bind(this));
+    }
 };
-
-
-function plot(spec) {
-    vg.parse.spec(spec, function(chart) { chart({el:"#graphs"}).update(); });
-}
 
 
 
@@ -733,7 +772,8 @@ DataSet.prototype.cache_data = function(json_state, res) {
 };
 
 DataSet.prototype.get_xlsx = function() {
-        window.location.href = url;
+    var url = this.dice_url('xlsx');
+    window.location.href = url;
 };
 
 
@@ -905,10 +945,10 @@ var SPEC2 = {
                             "fill": {"scale": "color", "field": "data.1"}
                         },
                         "update": {
-                            "fillOpacity": {"value": 1}
+                            "fillOpacity": {"value": 0.5}
                         },
                         "hover": {
-                            "fillOpacity": {"value": 0.5}
+                            "fillOpacity": {"value": 1}
                         }
                     }
                 }
