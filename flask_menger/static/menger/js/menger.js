@@ -387,6 +387,18 @@ var DataSet = function(json_state) {
     this.skip_zero = ko.observable(true);
     this.show_menu = ko.observable(true);
     this.active_view = ko.observable('table');
+    this.chart_type = ko.observable('table');
+    this.available_charts = ko.observable([]);
+
+    // Populate available charts
+    var av_ch = [];
+    for (var key in CHARTS) {
+        av_ch.push({
+            'key': key,
+            'label': CHARTS[key].label,
+        });
+    }
+    this.available_charts(av_ch);
 
     // fetch meta-data and init state
     $.get('/mng/info.json').then(function(info) {
@@ -455,9 +467,12 @@ DataSet.prototype.toggle_show_menu = function() {
     this.show_menu(!this.show_menu());
 };
 
-DataSet.prototype.set_active_view = function(obj, ev) {
+DataSet.prototype.set_active_view = function(obj, ev, chart_type) {
     var view = ev.target.href.split('#')[1];
     this.active_view(view);
+    if (chart_type) {
+        this.chart_type(chart_type);
+    }
 };
 
 DataSet.prototype.push_dim_select = function() {
@@ -702,40 +717,66 @@ DataSet.prototype.refresh_state = function() {
             this.totals(res.totals);
         }.bind(this));
     } else if (this.active_view() == 'graph') {
-        var spec = SPEC3;
-        var precise_format = d3.format('.3f');
-        var format = d3.format('.3s');
-        var tip_span = $('#vis_tip');
-        spec.width = this.show_menu() ? 500 : 900;
-        prm.then(function(res) {
-            for (var pos in res.data) {
-                var date = res.data[pos][0];
-                if (typeof date != 'object') {
-                    continue
-                }
-                res.data[pos][0] = new Date(date[0], date[1]-1, date[1]);
-            }
-            spec.data[0].values = res.data;
-            vg.parse.spec(spec, function(chart) {
-                var view = chart({el:"#vis", renderer: 'svg'}).update();
-                view.on("mouseover", function(event, item) {
-                    if (!item.datum.data.forEach) {
-                        return
-                    }
-                    var content = ''
-                    item.datum.data.forEach(function(item) {
-                        if (item.toPrecision) {
-                            content += format(item);
-                            content += " (" + precise_format(item) + ")";
-                        } else {
-                            content += (item);
-                        }
-                        content += '<br>'
-                    });
-                    tip_span.html(content);
 
-                }).update();
+        var chart_type = this.chart_type();
+        prm.then(function(res) {
+            // Pick chart
+            var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
+            var nb_dim = dim_sels.length;
+
+            var graph = $("#vis");
+            if (nb_dim > graph_nb_dim + 1) {
+                graph.html("<p>Too many dimensions</p>")
+                return;
+            } else if (nb_dim < graph_nb_dim) {
+                graph.html("<p>Not enough dimensions</p>")
+                return;
+            } else {
+                graph.find('p').remove();
+            }
+
+            var get_chart = function() {
+                var chart = CHARTS[chart_type].chart();
+                chart.x(function(d) {return d[0] })
+                    .y(function(d) {return d[nb_dim] });
+
+                this.show_menu.subscribe(function() {chart.update()});
+                return chart;
+            }.bind(this);
+
+
+            // Nest on extra dimensions
+            var nest = d3.nest();
+            CHARTS[chart_type].nesting(nest, nb_dim);
+            var data = nest.entries(res.data);
+
+            // Define nested charts
+            nv.addGraph(function() {
+                // create top-level join
+                var graph = d3.select("#vis")
+                    .selectAll('svg')
+                    .data(data)
+
+                var enter = graph.enter().append('svg');
+                graph.exit().remove();
+
+                enter.style('width', '50%')
+                enter.append("text")
+                    .attr("x", 0)
+                    .attr("y", 0)
+                    .attr("text-anchor", "left")
+                    .text(function(d,i){return d.key});
+
+                // call chart on each block
+                enter.each(function(d) {
+                    var chart = get_chart();
+                    d3.select(this).datum(d.values)
+                        .transition().duration(100)
+                        .call(chart);
+                });
+                return graph;
             });
+
         }.bind(this));
     }
 };
@@ -777,6 +818,53 @@ DataSet.prototype.get_xlsx = function() {
 };
 
 
+var CHARTS = {};
+CHARTS.pie = {
+    'chart': function() {
+        return nv.models.pieChart()
+            .showLabels(true);
+    },
+    'graph_nb_dim': 1,
+    'nesting' : function(nest, nb_dim) {
+        switch(nb_dim) {
+        case 1:
+            nest.key(function(d) {return ""});
+            break;
+        case 2:
+            nest.key(function(d) {return d[1]});
+            break
+        }
+    },
+    'label': "Pie Chart",
+}
+
+CHARTS.bar = {
+    'chart': function() {
+        var chart = nv.models.multiBarChart()
+            .staggerLabels(true)
+            .stacked(true)
+            .showLegend(true)
+        ;
+        chart.yAxis
+            .tickFormat(d3.format('.3s'));
+        return chart;
+    },
+    'graph_nb_dim': 2,
+    'nesting' : function(nest, nb_dim) {
+        switch(nb_dim) {
+        case 2:
+            nest.key(function(d) {return ""});
+            nest.key(function(d) {return d[1]});
+            break;
+        case 3:
+            nest.key(function(d) {return d[2]});
+            nest.key(function(d) {return d[1]});
+            break
+        }
+    },
+    'label': "Bar Chart",
+}
+
 var get_state = function() {
     try {
         var json_string = atob(window.location.hash.slice(1));
@@ -786,361 +874,6 @@ var get_state = function() {
     }
 }
 
-
-var SPEC = {
-    "width": 400,
-    "height": 200,
-    "data": [
-        {
-            "name": "table"
-        },
-    ],
-    "scales": [
-        {"name":"x",
-         "type":"ordinal",
-         "range":"width",
-         "domain":{"data":"table", "field":"data.0"}},
-        {"name":"y",
-         "range":"height",
-         "nice":true,
-         "domain":{"data":"table", "field":"data.1"}},
-        {"name": "color",
-         "type": "ordinal",
-         "range": "category10"
-        }
-    ],
-    "axes": [
-        {
-            "type":"x",
-            "scale":"x",
-            "properties": {
-                "labels": {
-                    "angle": {"value": -30},
-                    "fontSize": {"value": 12},
-                    "align": {"value": "right"},
-                    "baseline": {"value": "middle"},
-                    "dx": {"value": -3}
-                }
-            }
-        },
-        {
-            "type":"y",
-            "scale":"y"
-        }
-    ],
-    "marks": [
-        {
-            "type": "rect",
-            "from": {"data":"table"},
-            "properties": {
-                "enter": {
-                    "x": {"scale":"x", "field":"data.0"},
-                    "width": {"scale":"x", "band":true, "offset":-1},
-                    "y": {"scale":"y", "field":"data.1"},
-                    "y2": {"scale":"y", "value":0},
-                    "fill": {"scale": "color", "field": "data.0"},
-                },
-                "update": {
-                    "fillOpacity": {"value": 0.5}
-                },
-                "hover": {
-                    "fillOpacity": {"value": 1}}
-            }
-        }
-    ],
-    "legends": [
-        {
-            "fill": "color",
-            "title": "Legend",
-            "properties": {
-                "title": {
-                    "fontSize": {"value": 14}
-                },
-                "labels": {
-                    "fontSize": {"value": 12}
-                },
-                "symbols": {
-                    "stroke": {"value": "transparent"}
-                },
-            }
-        }
-    ]
-}
-
-var SPEC2 = {
-    "width": 500,
-    "height": 200,
-    "data": [
-        {
-            "name": "table",
-            "values": []
-        },
-        {
-            "name": "stats",
-            "source": "table",
-            "transform": [
-                {"type": "facet", "keys": ["data.0"]},
-                {"type": "stats", "value": "data.2"}
-            ]
-        }
-    ],
-    "scales": [
-        {
-            "name": "x",
-            "type": "ordinal",
-            "range": "width",
-            "domain": {"data": "table", "field": "data.0"}
-        },
-        {
-            "name": "y",
-            "range": "height",
-            "nice": true,
-            "domain": {"data": "stats", "field": "sum"}
-        },
-        {
-            "name": "color",
-            "type": "ordinal",
-            "domain": {"data": "table", "field": "data.1"},
-            "range": "category20"
-        }
-    ],
-    "axes": [
-        {
-            "type": "x",
-            "scale": "x",
-            "properties": {
-                "labels": {
-                    "angle": {"value": -30},
-                    "fontSize": {"value": 12},
-                    "align": {"value": "right"},
-                    "baseline": {"value": "middle"},
-                    "dx": {"value": -3}
-                }
-            }
-        },
-        {
-            "type": "y",
-            "scale": "y"
-        }
-    ],
-    "marks": [
-        {
-            "type": "group",
-            "from": {
-                "data": "table",
-                "transform": [
-                    {"type": "facet", "keys": ["data.1"]},
-                    {"type": "stack", "point": "data.0", "height": "data.2"}
-                ]
-            },
-            "marks": [
-                {
-                    "type": "rect",
-                    "properties": {
-                        "enter": {
-                            "x": {"scale": "x", "field": "data.0"},
-                            "width": {"scale": "x", "band": true, "offset": -1},
-                            "y": {"scale": "y", "field": "y"},
-                            "y2": {"scale": "y", "field": "y2"},
-                            "fill": {"scale": "color", "field": "data.1"}
-                        },
-                        "update": {
-                            "fillOpacity": {"value": 0.5}
-                        },
-                        "hover": {
-                            "fillOpacity": {"value": 1}
-                        }
-                    }
-                }
-            ]
-        }
-    ],
-
-    "legends": [
-        {
-            "fill": "color",
-            "title": "Legend",
-            "offset": 0,
-            "properties": {
-                "title": {
-                    "fontSize": {"value": 14}
-                },
-                "labels": {
-                    "fontSize": {"value": 12}
-                },
-                "symbols": {
-                    "stroke": {"value": "transparent"}
-                },
-            }
-        }
-    ]
-};
-
-var SPEC3 = {
-    "width": 500,
-    "height": 200,
-    "data": [
-        {
-            "name": "table",
-            "format": {"type":"json", "parse":{"0":"date"}}
-        }
-    ],
-    "scales": [
-        {
-            "name": "x",
-            "type": "time",
-            "range": "width",
-            "domain": {"data": "table", "field": "data.0"}
-        },
-        {
-            "name": "y",
-            "type": "linear",
-            "range": "height",
-            "nice": true,
-            "domain": {"data": "table", "field": "data.2"}
-        },
-        {
-            "name": "color", "type": "ordinal", "range": "category10"
-        }
-    ],
-    "axes": [
-        {"type": "x", "scale": "x", "tickSizeEnd": 0},
-        {"type": "y", "scale": "y"}
-    ],
-    "marks": [
-        {
-            "type": "group",
-            "from": {
-                "data": "table",
-                "transform": [{"type": "facet", "keys": ["data.1"]}]
-            },
-            "marks": [
-                {
-                    "type": "line",
-                    "properties": {
-                        "enter": {
-                            "x": {"scale": "x", "field": "data.0"},
-                            "y": {"scale": "y", "field": "data.2"},
-                            "stroke": {"scale": "color", "field": "data.1"},
-                            "strokeWidth": {"value": 2}
-                        }
-                    }
-                },
-                {
-                    "type": "text",
-                    "from": {
-                        "transform": [{
-                            "type": "filter",
-                            "test": "index==data.length-1"
-                        }]
-                    },
-                    "properties": {
-                        "enter": {
-                            "x": {"scale": "x", "field": "data.0", "offset": 2},
-                            "y": {"scale": "y", "field": "data.2"},
-                            "fill": {"scale": "color", "field": "data.1"},
-                            "text": {"field": "data.1"},
-                            "baseline": {"value": "middle"}
-                        }
-                    }
-                }
-            ]
-        }
-    ]
-};
-
-var SPEC4 = {
-    "width": 500,
-    "height": 200,
-    "data": [
-        {
-            "name": "table",
-            "format": {"type":"json", "parse":{"0":"date"}},
-        },
-        {
-            "name": "stats",
-            "source": "table",
-            "transform": [
-                {"type": "facet", "keys": ["data.0"]},
-                {"type": "stats", "value": "data.2"}
-            ]
-        }
-    ],
-    "scales": [
-        {
-            "name": "x",
-            "type": "time",
-            "range": "width",
-            "zero": false,
-            "domain": {"data": "table", "field": "data.0"}
-        },
-        {
-            "name": "y",
-            "type": "linear",
-            "range": "height",
-            "nice": true,
-            "domain": {"data": "stats", "field": "sum"}
-        },
-        {
-            "name": "color",
-            "type": "ordinal",
-            "range": "category10"
-        }
-    ],
-    "axes": [
-        {"type": "x", "scale": "x"},
-        {"type": "y", "scale": "y"}
-    ],
-    "marks": [
-        {
-            "type": "group",
-            "from": {
-                "data": "table",
-                "transform": [
-                    {"type": "facet", "keys": ["data.1"]},
-                    {"type": "stack", "point": "data.0", "height": "data.2"}
-                ]
-            },
-            "marks": [
-                {
-                    "type": "area",
-                    "properties": {
-                        "enter": {
-                            "interpolate": {"value": "monotone"},
-                            "x": {"scale": "x", "field": "data.0"},
-                            "y": {"scale": "y", "field": "y"},
-                            "y2": {"scale": "y", "field": "y2"},
-                            "fill": {"scale": "color", "field": "data.1"}
-                        },
-                        "update": {
-                            "fillOpacity": {"value": 1}
-                        },
-                        "hover": {
-                            "fillOpacity": {"value": 0.5}
-                        }
-                    }
-                }
-            ]
-        }
-    ],
-    "legends": [
-        {
-            "fill": "color",
-            "title": "Legend",
-            "properties": {
-                "title": {
-                    "fontSize": {"value": 14}
-                },
-                "labels": {
-                    "fontSize": {"value": 12}
-                },
-                "symbols": {
-                    "stroke": {"value": "transparent"}
-                },
-            }
-        }
-    ]
-};
 
 var init = function() {
     var json_state = get_state();

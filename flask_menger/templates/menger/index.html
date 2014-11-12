@@ -6,13 +6,14 @@
 
 {% block head %}
 <link href="{{url_for('menger.static', filename='css/bootstrap.min.css')}}" rel="stylesheet">
+<link href="{{url_for('menger.static', filename='css/nv.d3.min.css')}}" rel="stylesheet">
 <link href="{{url_for('menger.static', filename='css/menger.css')}}" rel="stylesheet">
 <script src="{{url_for('menger.static', filename='js/jquery-1.11.1.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/bootstrap.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/knockout-3.1.0.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/knockout-3.1.0.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/d3.v3.min.js')}}"></script>
-<script src="{{url_for('menger.static', filename='js/vega.min.js')}}"></script>
+<script src="{{url_for('menger.static', filename='js/nv.d3.min.js')}}"></script>
 <script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
 {% endblock %}
 
@@ -86,11 +87,22 @@
               Table
             </a>
           </li>
-          <li>
-            <a href="#graph" data-toggle="tab" data-bind="click: set_active_view">
-              Graphs
+
+          <li role="presentation" class="dropdown">
+            <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+              Graphs <span class="caret"></span>
             </a>
+            <ul class="dropdown-menu" role="menu" data-bind="foreach: available_charts">
+              <li>
+                <a href="#graph" data-toggle="tab"
+                   data-bind="click: function(obj, ev) {
+                              $parent.set_active_view(obj, ev, key)},
+                              text: label">
+                </a>
+              </li>
+            </ul>
           </li>
+
           <li class="pull-right">
             <button type="button" class="btn btn-primary"
                     data-toggle="button" aria-pressed="false"
@@ -131,9 +143,8 @@
               </tfoot>
             </table>
           </div> <!-- /#table -->
-          <div class="tab-pane" id="graph">
+          <div class="tab-pane"  id="graph">
             <div id="vis"></div>
-            <span id="vis_tip" class="text-muted small"></span>
           </div><!-- /#graph -->
         </div> <!-- /.tab-content -->
 

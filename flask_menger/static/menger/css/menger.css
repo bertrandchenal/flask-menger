@@ -2,7 +2,7 @@ li.menu-item.active {
     background-color: #428BCA;
 }
 
-li.active a {
+li.menu-item.active a {
     color: white;
 }
 
@@ -63,4 +63,14 @@ td.group, th.group {
 .list-group.menu-list {
     border-top: 1px solid #DDD;
     margin-bottom: 0;
+}
+
+svg {
+    height: 300px;
+    float: left;
+    padding: 10px;
+}
+
+.nvtooltip *{
+    font-size: 0.8em;
 }
