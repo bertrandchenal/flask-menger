@@ -724,15 +724,15 @@ DataSet.prototype.refresh_state = function() {
             var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
             var nb_dim = dim_sels.length;
 
-            var graph = $("#vis");
+            var vis = $("#vis");
             if (nb_dim > graph_nb_dim + 1) {
-                graph.html("<p>Too many dimensions</p>")
+                vis.html("<p>Too many dimensions</p>")
                 return;
             } else if (nb_dim < graph_nb_dim) {
-                graph.html("<p>Not enough dimensions</p>")
+                vis.html("<p>Not enough dimensions</p>")
                 return;
             } else {
-                graph.find('p').remove();
+                vis.empty();
             }
 
             var get_chart = function() {
@@ -753,12 +753,12 @@ DataSet.prototype.refresh_state = function() {
             // Define nested charts
             nv.addGraph(function() {
                 // create top-level join
-                var graph = d3.select("#vis")
+                var vis = d3.select("#vis")
                     .selectAll('svg')
                     .data(data)
 
-                var enter = graph.enter().append('svg');
-                graph.exit().remove();
+                var enter = vis.enter().append('svg');
+                vis.exit().remove();
 
                 enter.style('width', '50%')
                 enter.append("text")
@@ -774,7 +774,7 @@ DataSet.prototype.refresh_state = function() {
                         .transition().duration(100)
                         .call(chart);
                 });
-                return graph;
+                return vis;
             });
 
         }.bind(this));
