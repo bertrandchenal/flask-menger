@@ -87,6 +87,7 @@ def build_line(dimensions, key, coordinates, fmt_type=None):
             if None not in coord_tuple:
                 continue
             offset = len(get_head(coord_tuple))
+            offset += len(tuple(takewhile(is_none, values)))
             line.append(dim.format(values, offset=offset, fmt_type=fmt_type))
         return line
 
