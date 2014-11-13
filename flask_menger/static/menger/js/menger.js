@@ -722,8 +722,19 @@ DataSet.prototype.refresh_state = function() {
         prm.then(function(res) {
             // Pick chart
             var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
-            var nb_dim = dim_sels.length;
 
+            // Count dimensions
+            var nb_dim = 0;
+            for (var pos in dim_sels) {
+                var dim = dim_sels[pos].selected_dim();
+                // Frozen dimensions are not included in results
+                // TODO s/active/frozen/ -> on coordinate object
+                if (dim.get_value().indexOf(null) >= 0) {
+                    nb_dim++;
+                }
+            }
+
+            // Show error if dimension number mismatch
             var vis = $("#vis");
             if (nb_dim > graph_nb_dim + 1) {
                 vis.html("<p>Too many dimensions</p>")
@@ -735,6 +746,8 @@ DataSet.prototype.refresh_state = function() {
                 vis.empty();
             }
 
+            // Wrapper to instanciate new chart (and not reuse the
+            // same instance)
             var get_chart = function() {
                 var chart = CHARTS[chart_type].chart();
                 chart.x(function(d) {return d[0] })
