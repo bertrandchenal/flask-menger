@@ -738,11 +738,13 @@ DataSet.prototype.refresh_state = function() {
             // Show error if dimension number mismatch
             var vis = $("#vis");
             if (nb_dim > graph_nb_dim + 1) {
-                vis.html("<p>Too many dimensions</p>")
+                vis.html('<p>Too many dimensions</p>')
                 return;
             } else if (nb_dim < graph_nb_dim) {
-                vis.html("<p>Not enough dimensions</p>")
+                vis.html('<p>Not enough dimensions</p>')
                 return;
+            } else {
+                vis.find('p').remove();
             }
 
             // Wrapper to instanciate new chart (and not reuse the
