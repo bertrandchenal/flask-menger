@@ -70,9 +70,12 @@ td.group, th.group {
     width: 100%;
     height: 500px;
     float: left;
-    border: 5px solid white;
     background-color: whitesmoke;
+    margin-bottom: 20px; /* magically remove the scrollbar on parent */
+    border-radius: 10px;
+    border: 5px solid white;
 }
+
 
 p.label {
     color: black;

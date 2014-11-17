@@ -400,6 +400,12 @@ var DataSet = function(json_state) {
     }
     this.available_charts(av_ch);
 
+    // Clear vis area to avoid clash between different graph type
+    this.chart_type.subscribe(function() {
+        $("#vis").empty();
+    });
+
+
     // fetch meta-data and init state
     $.get('/mng/info.json').then(function(info) {
         this.set_info(info);
