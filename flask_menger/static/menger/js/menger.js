@@ -695,7 +695,7 @@ DataSet.prototype.refresh_state = function() {
             var value = dimension.get_value();
             return [dimension.name, value]
         }),
-        'skip_zero': this.skip_zero(),
+        'skip_zero': this.active_view() == 'graph'? false : this.skip_zero(),
         'pivot_on': pivot_on,
     }
     this.json_state(JSON.stringify(this.state));
@@ -720,6 +720,7 @@ DataSet.prototype.refresh_state = function() {
 
         var chart_type = this.chart_type();
         prm.then(function(res) {
+            this.cache_data(url, res);
             // Pick chart
             var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
 
@@ -742,8 +743,6 @@ DataSet.prototype.refresh_state = function() {
             } else if (nb_dim < graph_nb_dim) {
                 vis.html("<p>Not enough dimensions</p>")
                 return;
-            } else {
-                vis.empty();
             }
 
             // Wrapper to instanciate new chart (and not reuse the
@@ -767,24 +766,44 @@ DataSet.prototype.refresh_state = function() {
             nv.addGraph(function() {
                 // create top-level join
                 var vis = d3.select("#vis")
-                    .selectAll('svg')
-                    .data(data)
 
-                var enter = vis.enter().append('svg');
-                vis.exit().remove();
+                var wrapper = vis.selectAll('.svg-wrapper')
+                    .data(data, function(d) {return d.key;});
+                wrapper.enter().append('div');
+                wrapper.exit().remove();
 
-                enter.style('width', '50%')
-                enter.append("text")
-                    .attr("x", 0)
+                if (data.length == 1) {
+                    wrapper.attr('class','svg-wrapper');
+                } else {
+                    wrapper.attr('class','svg-wrapper multi');
+                }
+
+                var svg = wrapper.selectAll('svg')
+                    .data(function(d) {return [d]})
+                svg.enter().append("svg");
+
+                var label = svg.selectAll('text')
+                    .data(function(d,i){return [d]})
+                    .enter().append('text')
+
+                label.attr("x", 0)
                     .attr("y", 0)
                     .attr("text-anchor", "left")
-                    .text(function(d,i){return d.key});
+                    .text(function(d) {return d.key;});
 
                 // call chart on each block
-                enter.each(function(d) {
+                svg.each(function(d) {
+                    if (d.values.length > 6) {
+                        $(this).find ('.nv-legendWrap').empty()
+                    }
                     var chart = get_chart();
+                    if (d.values.length > 6) {
+                        chart.showLegend(false);
+                    } else {
+                        chart.showLegend(true);
+                    }
                     d3.select(this).datum(d.values)
-                        .transition().duration(100)
+                        .transition().duration(500)
                         .call(chart);
                 });
                 return vis;
@@ -856,7 +875,6 @@ CHARTS.bar = {
         var chart = nv.models.multiBarChart()
             .staggerLabels(true)
             .stacked(true)
-            .showLegend(true)
         ;
         chart.yAxis
             .tickFormat(d3.format('.3s'));
