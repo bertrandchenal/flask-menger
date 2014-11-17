@@ -770,28 +770,19 @@ DataSet.prototype.refresh_state = function() {
                 var vis = d3.select("#vis")
 
                 var wrapper = vis.selectAll('.svg-wrapper')
-                    .data(data, function(d) {return d.key;});
+                    .data(data);
                 wrapper.enter().append('div');
-                wrapper.exit().remove();
-
                 if (data.length == 1) {
                     wrapper.attr('class','svg-wrapper');
                 } else {
                     wrapper.attr('class','svg-wrapper multi');
                 }
+                wrapper.exit().remove();
 
                 var svg = wrapper.selectAll('svg')
                     .data(function(d) {return [d]})
                 svg.enter().append("svg");
-
-                var label = svg.selectAll('text')
-                    .data(function(d,i){return [d]})
-                    .enter().append('text')
-
-                label.attr("x", 0)
-                    .attr("y", 0)
-                    .attr("text-anchor", "left")
-                    .text(function(d) {return d.key;});
+                svg.exit().remove();
 
                 // call chart on each block
                 svg.each(function(d) {
@@ -808,6 +799,17 @@ DataSet.prototype.refresh_state = function() {
                         .transition().duration(500)
                         .call(chart);
                 });
+
+
+                var label = wrapper.selectAll('p.label')
+                    .data(function(d,i){return [d]});
+                // Force insertion before svg
+                label.enter().insert('p', 'svg')
+                label.exit().remove();
+                label.attr('class', 'label')
+                    .html(function(d) {return d.key;});
+
+
                 return vis;
             });
 

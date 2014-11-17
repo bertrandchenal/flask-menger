@@ -71,8 +71,11 @@ td.group, th.group {
     height: 500px;
     float: left;
     border: 5px solid white;
-    padding: 5px;
     background-color: whitesmoke;
+}
+
+p.label {
+    color: black;
 }
 
 .multi {
@@ -80,9 +83,6 @@ td.group, th.group {
     height: 400px;
 }
 
-svg {
-    padding-top: 10px;
-}
 .nvtooltip *{
     font-size: 0.8em;
 }
