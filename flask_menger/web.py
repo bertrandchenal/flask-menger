@@ -177,6 +177,21 @@ def dice(coordinates, measures, **options):
     coordinates = reg_coords + piv_coords
     dimensions = [get_dimension(spc, d) for d, v in coordinates]
 
+    # If a same dimension is present several times, mask the deepest
+    # with the shallowest
+    for i, (idim, ivals) in enumerate(coordinates):
+        for j, (jdim, jvals) in enumerate(coordinates):
+            if idim != jdim:
+                continue
+            if len(jvals) >= len(ivals):
+                continue
+
+            tail = ivals[len(jvals):]
+            head = tuple(None if v is None else ivals[pos] \
+                     for pos, v in enumerate(jvals))
+            ivals = head + tail
+            coordinates[i] = (idim, ivals)
+
     # Query DB
     data_dict = dice_by_msr(coordinates, measures, filters=filters)
     drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
