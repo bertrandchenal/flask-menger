@@ -72,6 +72,7 @@ td.group, th.group {
     float: left;
     background-color: whitesmoke;
     margin-bottom: 20px; /* magically remove the scrollbar on parent */
+    padding-bottom: 10px; /* svg sometimes overflows */
     border-radius: 10px;
     border: 5px solid white;
 }
