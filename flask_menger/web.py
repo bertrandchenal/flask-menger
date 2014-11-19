@@ -13,11 +13,17 @@ is_none = lambda x: x is None
 
 
 def get_label(space, name, value):
-    value = filter(not_none, value)
+    none_head = tuple(takewhile(is_none, value))
+    none_tail = tuple(takewhile(is_none, reversed(value)))
+    value = value[:-len(none_tail)]
+    offset = len(none_head)
     dim = get_dimension(space, name)
     if not value:
         return dim.label
-    return "%s: %s" % (dim.label, dim.format(value, fmt_type='txt'))
+    return "%s: %s" % (
+        dim.label,
+        dim.format(value, offset=offset, fmt_type='txt')
+    )
 
 
 def get_dimension(space, name):
@@ -78,7 +84,7 @@ def get_measure(name):
     return msr
 
 
-def build_line(dimensions, key, coordinates, fmt_type=None):
+def build_line(dimensions, key, coordinates, to_patch, all_coordinates, fmt_type=None):
     if fmt_type == 'json':
         line = []
         for dim, values, coord in zip(dimensions, key, coordinates):
@@ -92,7 +98,9 @@ def build_line(dimensions, key, coordinates, fmt_type=None):
         return line
 
     line = []
+    coord_pos = -1
     for dim, values, coord in zip(dimensions, key, coordinates):
+        coord_pos += 1
         coord_name, coord_tuple = coord
         # Frozen dimension: we only show last value
         if None not in coord_tuple:
@@ -101,12 +109,22 @@ def build_line(dimensions, key, coordinates, fmt_type=None):
             line.append(dim.format(val, offset=offset, fmt_type=fmt_type))
             continue
 
+        cut = None
+        if coord_pos in to_patch:
+            pdim, pvals = all_coordinates[to_patch[coord_pos]]
+            head = get_head(pvals)
+            cut = len(head)
+
+        for pos, value in enumerate(coord_tuple):
+            if cut is not None and pos <= cut:
+                continue
+            label = dim.levels[pos]
+
         for pos, value in enumerate(values):
             if value is None:
                 continue
-            if coord_tuple[pos] is None:
-                value = [None] * pos + [value]
-                line.append(dim.format(value, offset=pos, fmt_type=fmt_type))
+            value = [None] * pos + [value]
+            line.append(dim.format(value, offset=pos, fmt_type=fmt_type))
 
     return line
 
@@ -136,8 +154,6 @@ def build_headers(spc, reg_coords, to_patch, all_coordinates):
             cut = len(head)
 
         for pos, value in enumerate(coord_tuple):
-            if value is not None:
-                continue
             if cut is not None and pos <= cut:
                 continue
 
@@ -169,14 +185,6 @@ def dice(coordinates, measures, **options):
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
-    # Split coordinates into regular and pivot coordinates
-    reg_coords = [c for i, c in enumerate(coordinates) if i not in pivot_on]
-    piv_coords = [coordinates[i] for i in pivot_on]
-
-    # Recombine them
-    coordinates = reg_coords + piv_coords
-    dimensions = [get_dimension(spc, d) for d, v in coordinates]
-
     # If a same dimension is present several times, mask the deepest
     # with the shallowest
     for i, (idim, ivals) in enumerate(coordinates):
@@ -185,19 +193,28 @@ def dice(coordinates, measures, **options):
                 continue
             if len(jvals) >= len(ivals):
                 continue
-
             tail = ivals[len(jvals):]
             head = tuple(None if v is None else ivals[pos] \
                      for pos, v in enumerate(jvals))
             ivals = head + tail
+
             coordinates[i] = (idim, ivals)
+
+    # Split coordinates into regular and pivot coordinates
+    reg_coords = [c for i, c in enumerate(coordinates) if i not in pivot_on]
+    piv_coords = [coordinates[i] for i in pivot_on]
+
+    # Recombine them
+    coordinates = reg_coords + piv_coords
+    dimensions = [get_dimension(spc, d) for d, v in coordinates]
+
 
     # Query DB
     data_dict = dice_by_msr(coordinates, measures, filters=filters)
     drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
 
-    # Apply mask on values if the same dimension is on both in
-    # the regular set and the pivot set
+    # Apply mask on drill values if the same dimension appear several
+    # times
     to_patch = {}
     for i, (idim, ivals) in enumerate(coordinates):
         for j, (jdim, jvals) in enumerate(coordinates):
@@ -205,8 +222,7 @@ def dice(coordinates, measures, **options):
                 continue
             if len(jvals) >= len(ivals):
                 continue
-
-            # Apply mask on drills and filter doubles
+            # Apply mask on drills and remove doubles
             drills[i] = sorted(set(mask(drills[i], jvals)))
             to_patch[i] = j
 
@@ -246,6 +262,7 @@ def dice(coordinates, measures, **options):
 
     for reg_key in product(*reg_drills):
         line = build_line(reg_dims, reg_key, reg_coords,
+                          to_patch, coordinates,
                           fmt_type=format_type)
         values = []
         for piv_key in product(*piv_drills):
