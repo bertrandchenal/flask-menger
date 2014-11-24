@@ -112,18 +112,13 @@ def build_line(dimensions, key, coordinates, to_patch, all_coordinates, fmt_type
         cut = None
         if coord_pos in to_patch:
             pdim, pvals = all_coordinates[to_patch[coord_pos]]
-            head = get_head(pvals)
-            cut = len(head)
+            none_head = tuple(takewhile(is_none, pvals))
+            cut = len(none_head)
 
-        for pos, value in enumerate(coord_tuple):
-            if cut is not None and pos <= cut:
+        for pos, coord in enumerate(coord_tuple):
+            if coord is not None or (cut and pos < cut):
                 continue
-            label = dim.levels[pos]
-
-        for pos, value in enumerate(values):
-            if value is None:
-                continue
-            value = [None] * pos + [value]
+            value = [None] * pos + [values[pos]]
             line.append(dim.format(value, offset=pos, fmt_type=fmt_type))
 
     return line
@@ -150,11 +145,11 @@ def build_headers(spc, reg_coords, to_patch, all_coordinates):
         cut = None
         if coord_pos in to_patch:
             pdim, pvals = all_coordinates[to_patch[coord_pos]]
-            head = get_head(pvals)
-            cut = len(head)
+            none_head = tuple(takewhile(is_none, pvals))
+            cut = len(none_head)
 
-        for pos, value in enumerate(coord_tuple):
-            if cut is not None and pos <= cut:
+        for pos, coord in enumerate(coord_tuple):
+            if coord is not None or (cut and pos < cut):
                 continue
 
             label = dim.levels[pos]
@@ -207,7 +202,6 @@ def dice(coordinates, measures, **options):
     # Recombine them
     coordinates = reg_coords + piv_coords
     dimensions = [get_dimension(spc, d) for d, v in coordinates]
-
 
     # Query DB
     data_dict = dice_by_msr(coordinates, measures, filters=filters)
