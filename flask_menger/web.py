@@ -112,8 +112,8 @@ def build_line(dimensions, key, coordinates, to_patch, all_coordinates, fmt_type
         cut = None
         if coord_pos in to_patch:
             pdim, pvals = all_coordinates[to_patch[coord_pos]]
-            none_head = tuple(takewhile(is_none, pvals))
-            cut = len(none_head)
+            tail = tuple(takewhile(not_none, reversed(pvals)))
+            cut = len(pvals) - len(tail)
 
         for pos, coord in enumerate(coord_tuple):
             if coord is not None or (cut and pos < cut):
@@ -145,8 +145,8 @@ def build_headers(spc, reg_coords, to_patch, all_coordinates):
         cut = None
         if coord_pos in to_patch:
             pdim, pvals = all_coordinates[to_patch[coord_pos]]
-            none_head = tuple(takewhile(is_none, pvals))
-            cut = len(none_head)
+            tail = tuple(takewhile(not_none, reversed(pvals)))
+            cut = len(pvals) - len(tail)
 
         for pos, coord in enumerate(coord_tuple):
             if coord is not None or (cut and pos < cut):
