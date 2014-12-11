@@ -1,16 +1,26 @@
 from collections import defaultdict
 from itertools import groupby, product, takewhile, dropwhile, cycle
+from tempfile import mkdtemp
 import logging
 import os
-from tempfile import mkdtemp
 
 from menger import Dimension, Measure, get_space
 
+MAX_COMBINATION = 10**6
+DEFAULT_LIMIT = 10**5
 
 logger = logging.getLogger('menger.flask')
 not_none = lambda x: x is not None
 is_none = lambda x: x is None
 
+class LimitException(Exception):
+    pass
+
+def nb_combination(lists):
+    res = 1
+    for l in lists:
+        res = res * len(l)
+    return res
 
 def get_label(space, name, value):
     none_head = tuple(takewhile(is_none, value))
@@ -169,6 +179,8 @@ def dice(coordinates, measures, **options):
     format_type = options.get('format_type')
     filters = options.get('filters')
     skip_zero = options.get('skip_zero')
+    limit = options.get('limit') or DEFAULT_LIMIT
+
     if format_type == 'txt':
         pivot_on = options.get('pivot_on', [])
     else:
@@ -204,8 +216,11 @@ def dice(coordinates, measures, **options):
     dimensions = [get_dimension(spc, d) for d, v in coordinates]
 
     # Query DB
-    data_dict = dice_by_msr(coordinates, measures, filters=filters)
     drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
+
+    if nb_combination(drills) > MAX_COMBINATION:
+        raise LimitException('Number of requested combination is too large')
+    data_dict = dice_by_msr(coordinates, measures, filters=filters, limit=limit)
 
     # Apply mask on drill values if the same dimension appear several
     # times
@@ -229,6 +244,7 @@ def dice(coordinates, measures, **options):
     # Create columns definition
     reg_cols = build_headers(spc, reg_coords, to_patch, coordinates)
     msr_cols = []
+
     for piv_key in product(*piv_drills):
         dim_names = []
         for d, v in zip(piv_dims, piv_key):
@@ -272,6 +288,9 @@ def dice(coordinates, measures, **options):
                     for m, v in zip(cycle(measures), values))
         data.append(line)
 
+        if limit is not None and (len(data) * len(line)) > limit:
+            raise LimitException('Size limit reached')
+
         # Aggregate totals
         if totals is None:
             totals = values
@@ -294,11 +313,10 @@ def dice(coordinates, measures, **options):
     }
 
 
-def dice_by_msr(coordinates, measures, filters=None):
+def dice_by_msr(coordinates, measures, filters=None, limit=None):
     # Create one group of measures per space
     spc_msr = groupby((m.split('.') for m in measures),
                      lambda x: x[0])
-
     data = defaultdict(lambda: [0 for _ in measures])
     key_len = len(coordinates)
     for spc_pos, (spc_name, msrs) in enumerate(spc_msr):
@@ -307,7 +325,10 @@ def dice_by_msr(coordinates, measures, filters=None):
             raise Exception('space "%s" not found' % spc_name)
 
         filters = filters or {}
-        for key, vals in spc.dice(coordinates, (m[1] for m in msrs), filters):
+        results = spc.dice(coordinates, (m[1] for m in msrs), filters)
+        for key, vals in results:
+            if limit is not None and len(data) > limit:
+                raise LimitException('Size limit reached')
             for pos, val in enumerate(vals):
                 data[key][spc_pos + pos] = val
     return data

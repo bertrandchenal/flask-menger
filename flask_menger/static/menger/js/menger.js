@@ -389,6 +389,7 @@ var DataSet = function(json_state) {
     this.active_view = ko.observable('table');
     this.chart_type = ko.observable('table');
     this.available_charts = ko.observable([]);
+    this.error = ko.observable();
 
     // Populate available charts
     var av_ch = [];
@@ -714,6 +715,10 @@ DataSet.prototype.refresh_state = function() {
     var ext = this.active_view() == 'table' ? 'txt' : 'json';
     var url = this.dice_url(ext);
     var prm = this.fetch_data(url);
+    prm.then(function(res) {
+        this.error(res.error);
+    }.bind(this));
+
     if (this.active_view() == 'table') {
         prm.then(function(res) {
             this.cache_data(url, res);

@@ -6,7 +6,7 @@ from flask import (current_app, Blueprint, render_template, request, json,
 from flask.ext.login import login_required
 from menger import connect, get_space, iter_spaces, register
 
-from flask_menger.web import build_xlsx, dice
+from flask_menger.web import build_xlsx, dice, LimitException
 
 menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
@@ -119,7 +119,11 @@ def mng(method, ext):
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
-        res = do_dice(query, filters, ext)
+        try:
+            res = do_dice(query, filters, ext)
+        except LimitException:
+            return json.jsonify(error='Request too big')
+
         if ext == 'xlsx':
             output_file = build_xlsx(res)
             attachment_filename = compute_filename(
@@ -144,7 +148,7 @@ def home():
     return render_template("index.html")
 
 
-def do_dice(query, filters, ext):
+def do_dice(query, filters, ext, limit=None):
     res = {}
     dimensions = query.get('dimensions', [])
     for d in dimensions:
@@ -162,7 +166,8 @@ def do_dice(query, filters, ext):
                     filters=filters,
                     skip_zero=skip_zero,
                     pivot_on=pivot_on,
-                )
+                    limit=limit,
+        )
 
 def compute_filename(pattern):
     now = datetime.datetime.now()
