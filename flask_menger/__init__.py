@@ -1,5 +1,6 @@
-import datetime
 from hashlib import md5
+import datetime
+import gzip
 
 from flask import (current_app, Blueprint, render_template, request, json,
                    send_file)
@@ -7,48 +8,23 @@ from flask.ext.login import login_required
 from menger import connect, get_space, iter_spaces, register
 
 from flask_menger.web import build_xlsx, dice, LimitException
+from flask_menger.util import DummyCache, FSCache
 
+fs_cache = DummyCache()
 menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
 
 
-class LRU:
-
-    def __init__(self, size=1000):
-        self.fresh = {}
-        self.stale = {}
-        self.size = size
-
-    def get(self, key, default=None):
-        if key in self.fresh:
-            return self.fresh[key]
-
-        if key in self.stale:
-            value = self.stale[key]
-            # Promote key to fresh dict
-            self.set(key, value)
-            return value
-        return default
-
-    def clean(self, partial=False):
-        if partial:
-            # Discard only stale data
-            self.stale = self.fresh
-            self.fresh = {}
-            return
-
-        # Full clean
-        self.stale = {}
-        self.fresh = {}
-
-    def set(self, key, value):
-        self.fresh[key] = value
-        if len(self.fresh) > self.size:
-            self.clean(partial=True)
-
-QUERY_CACHE = LRU()
-register('load', QUERY_CACHE.clean)
+@menger_app.record
+def init_cache(state):
+    global fs_cache
+    app = state.app
+    cache_dir = app.config.get('MENGER_CACHE_DIR')
+    max_cache = app.config.get('MENGER_MAX_CACHE')
+    if cache_dir:
+        fs_cache = FSCache(cache_dir, max_cache)
+        register('load', fs_cache.reset)
 
 
 # TODO ext should be ony json|xlsx (not text)
@@ -91,13 +67,22 @@ def mng(method, ext):
         h.update(filters_str)
     qid = h.hexdigest()
 
-    cached_value = QUERY_CACHE.get(qid)
+    # Return cached value if any
+    cached_value = fs_cache.get(qid)
     if cached_value is not None:
-        return cached_value
+        resp = current_app.response_class(
+            mimetype='application/json',
+        )
+        accept_encoding = request.headers.get('Accept-Encoding', '')
+        if 'gzip' not in accept_encoding.lower():
+            resp.set_data(gzip.decompress(cached_value))
+        else:
+            resp.headers['Content-Encoding'] = 'gzip'
+            resp.set_data(cached_value)
+        return resp
 
     raw_query = request.args.get('query', '{}')
     query = json.loads(raw_query)
-
     res = {}
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
@@ -137,10 +122,23 @@ def mng(method, ext):
     if ext not in ('json', 'txt'):
         return 'Unknown extension "%s"' % ext, 404
 
-    json_res = json.jsonify(**res)
-    QUERY_CACHE.set(qid, json_res)
-    return json_res
 
+    # Cache result
+    json_res = json.dumps(res)
+    zipped_res = gzip.compress(json_res.encode())
+    fs_cache.set(qid, zipped_res)
+
+    # Return response
+    resp = current_app.response_class(
+            mimetype='application/json',
+        )
+    accept_encoding = request.headers.get('Accept-Encoding', '')
+    if 'gzip' not in accept_encoding.lower():
+        resp.set_data(json_res)
+    else:
+        resp.headers['Content-Encoding'] = 'gzip'
+        resp.set_data(zipped_res)
+    return resp
 
 @menger_app.route('/')
 @login_required
