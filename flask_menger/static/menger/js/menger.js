@@ -730,10 +730,11 @@ DataSet.prototype.refresh_state = function() {
     } else if (this.active_view() == 'graph') {
 
         var chart_type = this.chart_type();
+        var chart_class = CHARTS[chart_type];
         prm.then(function(res) {
             this.cache_data(url, res);
             // Pick chart
-            var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
+            var graph_nb_dim = chart_class.graph_nb_dim;
 
             // Count dimensions
             var nb_dim = 0;
@@ -761,9 +762,9 @@ DataSet.prototype.refresh_state = function() {
             // Wrapper to instanciate new chart (and not reuse the
             // same instance)
             var get_chart = function() {
-                var chart = CHARTS[chart_type].chart();
-                chart.x(function(d) {return d[0] })
-                    .y(function(d) {return d[nb_dim] });
+                var chart = chart_class.chart();
+                chart.x(function(d) {return d[0]})
+                    .y(function(d) {return d[nb_dim]});
 
                 this.show_menu.subscribe(function() {chart.update()});
                 return chart;
@@ -772,7 +773,7 @@ DataSet.prototype.refresh_state = function() {
 
             // Nest on extra dimensions
             var nest = d3.nest();
-            CHARTS[chart_type].nesting(nest, nb_dim);
+            chart_class.nesting(nest, nb_dim);
             var data = nest.entries(res.data);
 
             // Define nested charts
@@ -801,11 +802,7 @@ DataSet.prototype.refresh_state = function() {
                         $(this).find ('.nv-legendWrap').empty()
                     }
                     var chart = get_chart();
-                    if (d.values.length > 6) {
-                        chart.showLegend(false);
-                    } else {
-                        chart.showLegend(true);
-                    }
+                    chart_class.update(chart, d.values.length, nb_dim);
                     d3.select(this).datum(d.values)
                         .transition().duration(500)
                         .call(chart);
@@ -883,7 +880,10 @@ CHARTS.pie = {
         }
     },
     'label': "Pie Chart",
-}
+    'update': function(chart, nb_values, nb_dim) {
+        chart.showLegend(nb_values <= 6);
+    },
+};
 
 CHARTS.bar = {
     'chart': function() {
@@ -895,9 +895,13 @@ CHARTS.bar = {
             .tickFormat(d3.format('.3s'));
         return chart;
     },
-    'graph_nb_dim': 2,
+    'graph_nb_dim': 1,
     'nesting' : function(nest, nb_dim) {
         switch(nb_dim) {
+        case 1:
+            nest.key(function(d) {return ""});
+            nest.key(function(d) {return ""});
+            break;
         case 2:
             nest.key(function(d) {return ""});
             nest.key(function(d) {return d[1]});
@@ -909,7 +913,10 @@ CHARTS.bar = {
         }
     },
     'label': "Bar Chart",
-}
+    'update': function(chart, nb_values, nb_dim) {
+        chart.showLegend(nb_dim != 1 && nb_values <= 6);
+    },
+};
 
 var get_state = function() {
     try {
