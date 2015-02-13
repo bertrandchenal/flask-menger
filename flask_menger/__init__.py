@@ -24,7 +24,7 @@ def init_cache(state):
     max_cache = app.config.get('MENGER_MAX_CACHE')
     if cache_dir:
         fs_cache = FSCache(cache_dir, max_cache)
-        register('load', fs_cache.reset)
+        register('clear_cache', fs_cache.reset)
 
 
 # TODO ext should be ony json|xlsx (not text)
