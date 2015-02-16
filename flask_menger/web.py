@@ -175,7 +175,6 @@ def build_headers(spc, reg_coords, to_patch, all_coordinates):
 
 
 def dice(coordinates, measures, **options):
-
     format_type = options.get('format_type')
     filters = options.get('filters')
     skip_zero = options.get('skip_zero')
@@ -192,8 +191,9 @@ def dice(coordinates, measures, **options):
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
-    # If a same dimension is present several times, mask the deepest
-    # with the shallowest
+    # Relaxing phase, remove constrains on one coordinate if the other
+    # is less strict. It means that if a same dimension is present
+    # several times, we mask the deepest with the shallowest
     for i, (idim, ivals) in enumerate(coordinates):
         for j, (jdim, jvals) in enumerate(coordinates):
             if idim != jdim:
@@ -204,7 +204,6 @@ def dice(coordinates, measures, **options):
             head = tuple(None if v is None else ivals[pos] \
                      for pos, v in enumerate(jvals))
             ivals = head + tail
-
             coordinates[i] = (idim, ivals)
 
     # Split coordinates into regular and pivot coordinates
@@ -217,13 +216,13 @@ def dice(coordinates, measures, **options):
 
     # Query DB
     drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
-
     if nb_combination(drills) > MAX_COMBINATION:
         raise LimitException('Number of requested combination is too large')
     data_dict = dice_by_msr(coordinates, measures, filters=filters, limit=limit)
 
-    # Apply mask on drill values if the same dimension appear several
-    # times
+    # Collapsing phase, we remove some combinations that makes no
+    # sense: Apply mask on drill values if the same dimension appear
+    # several times
     to_patch = {}
     for i, (idim, ivals) in enumerate(coordinates):
         for j, (jdim, jvals) in enumerate(coordinates):
