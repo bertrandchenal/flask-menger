@@ -734,7 +734,8 @@ DataSet.prototype.refresh_state = function() {
         prm.then(function(res) {
             this.cache_data(url, res);
             // Pick chart
-            var graph_nb_dim = chart_class.graph_nb_dim;
+            var graph_min_dim = chart_class.graph_min_dim;
+            var graph_max_dim = chart_class.graph_max_dim;
 
             // Count dimensions
             var nb_dim = 0;
@@ -749,10 +750,10 @@ DataSet.prototype.refresh_state = function() {
 
             // Show error if dimension number mismatch
             var vis = $("#vis");
-            if (nb_dim > graph_nb_dim + 1) {
+            if (nb_dim > graph_max_dim) {
                 vis.html('<p>Too many dimensions</p>')
                 return;
-            } else if (nb_dim < graph_nb_dim) {
+            } else if (nb_dim < graph_min_dim) {
                 vis.html('<p>Not enough dimensions</p>')
                 return;
             } else {
@@ -868,7 +869,8 @@ CHARTS.pie = {
         return nv.models.pieChart()
             .showLabels(true);
     },
-    'graph_nb_dim': 1,
+    'graph_min_dim': 1,
+    'graph_max_dim': 2,
     'nesting' : function(nest, nb_dim) {
         switch(nb_dim) {
         case 1:
@@ -895,7 +897,8 @@ CHARTS.bar = {
             .tickFormat(d3.format('.3s'));
         return chart;
     },
-    'graph_nb_dim': 1,
+    'graph_min_dim': 1,
+    'graph_max_dim': 3,
     'nesting' : function(nest, nb_dim) {
         switch(nb_dim) {
         case 1:
