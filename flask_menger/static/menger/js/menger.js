@@ -100,10 +100,13 @@ Coordinate.prototype.set_value = function(value, offset) {
         return;
     }
     offset = offset || 0;
-
     var prm = this.drill();
     if (!value[0]) {
-        this.dimension.dimsel.level_index(value.length + offset - 1);
+        // If level as been selected enforce it, else select root level
+        var l = value.length;
+        var idx =  l > 1 ? l : 0;
+        this.dimension.dimsel.level_index(idx);
+
         prm.then(function() {
             this.dimension.selected_coord(this);
         }.bind(this));
@@ -117,9 +120,10 @@ Coordinate.prototype.set_value = function(value, offset) {
             if (last_val != value[0]) {
                 continue;
             }
+
             value = value.splice(1);
             if (value.length) {
-                return child.set_value(value, offset + 1);
+                return child.set_value(value);
             }
             child.activate();
             break;
@@ -358,16 +362,14 @@ var Level = function(name, index, dimsel) {
     this.index = index;
     this.dimsel = dimsel;
 
-    if (dimsel.level_index() == index) {
-        this.active = true;
-    } else {
-        this.active = false;
-    }
+    this.active = ko.computed(function() {
+        return dimsel.level_index() == index;
+    })
 };
 
 Level.prototype.activate = function() {
-    this.active = true;
-    this.dimsel.level_index(this.index);
+    var idx = this.index == this.dimsel.level_index() ? 0 : this.index;
+    this.dimsel.level_index(idx);
 };
 
 
@@ -414,7 +416,6 @@ var DataSet = function(json_state) {
     }.bind(this));
 
     this.measures.subscribe(this.measures_changed.bind(this));
-
 
     // compute state
     ko.computed(this.refresh_state.bind(this)).extend({
