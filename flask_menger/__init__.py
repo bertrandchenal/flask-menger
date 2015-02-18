@@ -61,7 +61,9 @@ def mng(method, ext):
         return json.jsonify(spaces=spaces)
 
     # Build unique id for query
-    h = md5(request.url.encode())
+    query = expand_query(method)
+    query_string = json.dumps(sorted(query.items()))
+    h = md5(json.dumps(query_string).encode())
     if filters:
         filters_str = str(sorted(filters.items())).encode()
         h.update(filters_str)
@@ -81,8 +83,6 @@ def mng(method, ext):
             resp.set_data(cached_value)
         return resp
 
-    raw_query = request.args.get('query', '{}')
-    query = json.loads(raw_query)
     res = {}
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
@@ -139,6 +139,27 @@ def mng(method, ext):
         resp.headers['Content-Encoding'] = 'gzip'
         resp.set_data(zipped_res)
     return resp
+
+
+def expand_query(method):
+    raw_query = request.args.get('query', '{}')
+    query = json.loads(raw_query)
+    if method == 'dice':
+        measures = query['measures']
+        spc_name = measures[0].split('.')[0]
+        spc = get_space(spc_name)
+        dimensions = query.get('dimensions', [])
+        for pos, (name, values) in enumerate(dimensions):
+            dim = getattr(spc, name)
+            dimensions[pos][1] = dim.expand(values)
+
+    elif method == 'drill':
+        spc = get_space(query['space'])
+        dim = getattr(spc, query['dimension'])
+        query['value'] = dim.expand(query['value'])
+
+    return query
+
 
 @menger_app.route('/')
 @login_required
