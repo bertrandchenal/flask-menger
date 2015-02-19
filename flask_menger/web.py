@@ -288,9 +288,6 @@ def dice(coordinates, measures, **options):
                     for m, v in zip(cycle(measures), values))
         data.append(line)
 
-        if limit is not None and (len(data) * len(line)) > limit:
-            raise LimitException('Size limit reached')
-
         # Aggregate totals
         if totals is None:
             totals = values
