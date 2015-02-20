@@ -94,7 +94,8 @@ def get_measure(name):
     return msr
 
 
-def build_line(dimensions, key, coordinates, to_patch, all_coordinates, fmt_type=None):
+def build_line(dimensions, key, coordinates, to_patch, all_coordinates,
+               fmt_type=None):
     if fmt_type == 'json':
         line = []
         for dim, values, coord in zip(dimensions, key, coordinates):
