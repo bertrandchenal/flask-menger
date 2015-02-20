@@ -95,16 +95,16 @@ Coordinate.prototype.has_children = function() {
     return this.value.length < this.dimension.levels().length;
 };
 
-Coordinate.prototype.set_value = function(value, offset) {
+Coordinate.prototype.set_value = function(value) {
     if (!value || !value.length) {
         return;
     }
-    offset = offset || 0;
+
     var prm = this.drill();
     if (!value[0]) {
         // If level as been selected enforce it, else select root level
         var l = value.length;
-        var idx =  l > 1 ? l : 0;
+        var idx =  l > 1 ? l-1 : 0;
         this.dimension.dimsel.level_index(idx);
 
         prm.then(function() {
