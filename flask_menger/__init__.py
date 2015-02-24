@@ -98,6 +98,7 @@ def mng(method, ext):
             dim = getattr(spc, name)
             value = tuple(query.get('value', []))
             data = list(dim.drill(value))
+            data.extend(dim.aliases(value))
             offset = len(value)
             mk_label = lambda x: dim.format(value + (x,), fmt_type='txt',
                                             offset=offset)
