@@ -36,9 +36,9 @@ def init_cache(state):
 def mng(method, ext):
     get_permission = current_app.config.get('MENGER_FILTER')
     if get_permission:
-        filters = get_permission()
+        filters = list(get_permission().items())
     else:
-        filters = None
+        filters = []
 
     if method == 'info':
         spaces = []
@@ -60,12 +60,30 @@ def mng(method, ext):
 
         return json.jsonify(spaces=spaces)
 
-    # Build unique id for query
     query = expand_query(method)
+    spc_name = query.get('space')
+
+    # Not cached to avoid trashing other queries
+    if method == 'search':
+        with connect(current_app.config['MENGER_DATABASE']):
+            spc = get_space(spc_name)
+            if not spc:
+                return ('space "%s" not found' % spc_name, 404)
+
+            name = query.get('dimension')
+            if not hasattr(spc, name):
+                return ('space "%s" has not dimension %s' % (spc_name, name),
+                            404)
+            dim = getattr(spc, name)
+            res = list(dim.search(query['value']))
+            return json.jsonify(data=res)
+
+
+    # Build unique id for query
     query_string = json.dumps(sorted(query.items()))
     h = md5(json.dumps(query_string).encode())
     if filters:
-        filters_str = str(sorted(filters.items())).encode()
+        filters_str = str(sorted(filters)).encode()
         h.update(filters_str)
     qid = h.hexdigest()
 
@@ -86,7 +104,6 @@ def mng(method, ext):
     res = {}
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
-            spc_name = query.get('space')
             spc = get_space(spc_name)
             if not spc:
                 return ('space "%s" not found' % spc_name, 404)
@@ -105,6 +122,16 @@ def mng(method, ext):
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
+        # Add user filters to the permission one
+        query_filters = query.get('filters', [])
+        measures = query['measures']
+        spc_name = measures[0].split('.')[0]
+        spc = get_space(spc_name)
+        for dim_name, filter_val, depth in query_filters:
+            dim = getattr(spc, dim_name)
+            coord = (None,) * (depth-1) + (filter_val,)
+            filters.append((dim_name, dim.glob(coord)))
+
         try:
             res = do_dice(query, filters, ext)
         except LimitException:
@@ -145,6 +172,7 @@ def mng(method, ext):
 def expand_query(method):
     raw_query = request.args.get('query', '{}')
     query = json.loads(raw_query)
+
     if method == 'dice':
         measures = query['measures']
         spc_name = measures[0].split('.')[0]

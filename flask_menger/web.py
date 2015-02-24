@@ -192,21 +192,6 @@ def dice(coordinates, measures, **options):
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
-    # Relaxing phase, remove constrains on one coordinate if the other
-    # is less strict. It means that if a same dimension is present
-    # several times, we mask the deepest with the shallowest
-    for i, (idim, ivals) in enumerate(coordinates):
-        for j, (jdim, jvals) in enumerate(coordinates):
-            if idim != jdim:
-                continue
-            if len(jvals) >= len(ivals):
-                continue
-            tail = ivals[len(jvals):]
-            head = tuple(None if v is None else ivals[pos] \
-                     for pos, v in enumerate(jvals))
-            ivals = head + tail
-            coordinates[i] = (idim, ivals)
-
     # Split coordinates into regular and pivot coordinates
     reg_coords = [c for i, c in enumerate(coordinates) if i not in pivot_on]
     piv_coords = [coordinates[i] for i in pivot_on]

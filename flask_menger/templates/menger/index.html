@@ -198,17 +198,22 @@
            data-bind="attr: {href: '#collapse-dimension-' + $index()},
                       text: label">
         </a>
-        <a class="glyphicon pull-right"
-           data-bind="click: toggle_options, css: {active: show_options},
-                      if: selected_dim().selected_coord()">
-          &#9776;
-        </a>
+        <span class="pull-right">
+          <a class="glyphicon glyphicon-search"
+             style="padding-right:0.2em;"
+             data-bind="click: click_search, css: {active: card() == 'search'}">
+          </a>
+          <a class="glyphicon"
+             data-bind="click: click_option, css: {active: card() == 'option'}">
+            &#9776;
+          </a>
+        </span>
       </h4>
     </div>
     <div class="panel-collapse collapse"
          data-bind="attr: {id: 'collapse-dimension-' + $index()},
-                    css: {option: show_options}">
-      <div data-bind="if:show_options()">
+                    css: {grey_bg: card() != 'main'}">
+      <div data-bind="if:card() == 'option'">
         <div class="panel-body">
           <h5>Show:</h5>
 
@@ -262,7 +267,7 @@
         </div>
       </div>
 
-      <div data-bind="if:!show_options()">
+      <div data-bind="if:card() == 'main'">
         <ul class="list-group menu-list" data-bind="foreach:choice">
           <li class="list-group-item clearfix menu-item"
               data-bind="css: {active: active()}">
@@ -277,6 +282,36 @@
             </div>
           </li>
         </ul>
+      </div>
+
+      <div data-bind="if:card() == 'search'">
+        <div class="panel-body">
+
+          <div class="input-group">
+            <input type="text" class="form-control"
+                   data-bind="value:current_search, valueUpdate:'afterkeydown'"
+                   name="fitler" placeholder="Search"/>
+            <span class="input-group-btn">
+              <button class="btn btn-default" type="button"
+                      data-bind="click: click_clear_search">
+                <span class="glyphicon glyphicon-remove">
+              </button>
+            </span>
+          </div>
+        </div>
+
+        <ul class="list-group menu-list" data-bind="foreach:search_results">
+          <li class="list-group-item menu-item"
+              data-bind="css: {active: active}">
+            <a href="#" data-bind="text: name, click: select">
+            </a>
+            <span data-bind="text: level" class="text-muted small">
+            </span>
+          </li>
+        </ul>
+
+
+
       </div>
 
     </div>

@@ -7,6 +7,9 @@ var MAX_DATA = 10;
 var DRILL_CACHE = {};
 var PAGE_LENGTH = 100;
 
+// Simple helper
+var identity = function(x) {return x;}
+
 // Force waiting cursor when an ajax call is in progress
 $.ajaxSetup({
     'beforeSend': function(jqXHR, settings) {
@@ -143,6 +146,9 @@ var Dimension = function(name, label, levels, dimsel) {
 };
 
 Dimension.prototype.choice = function() {
+    if (!this.selected_coord()) {
+        return [];
+    }
     return this.selected_coord().children;
 };
 
@@ -158,7 +164,7 @@ Dimension.prototype.drill = function() {
 };
 
 Dimension.prototype.activate = function() {
-    var old = this.dimsel.selected_dim()
+    var old = this.dimsel.selected_dim();
     old && old.active(false);
     this.dimsel.selected_dim(this);
     this.active(true);
@@ -182,7 +188,8 @@ Dimension.prototype.set_value = function(value) {
 }
 
 Dimension.prototype.get_value = function() {
-    var coord = this.selected_coord();
+    var coord = this.selected_coord() || new Coordinate(this, null, []);
+
     if (coord) {
         var actives = this.choice().filter(function(d) {
             return d.active();
@@ -202,10 +209,31 @@ Dimension.prototype.get_value = function() {
     return [null];
 };
 
+// Small object to hold a search result used when the user filter on
+// the dimension
+var SearchItem = function(name, depth, dim_sel) {
+    this.name = name;
+    this.depth = depth;
+    this.level = dim_sel.selected_dim().levels()[depth - 1];
+    this.dim_sel = dim_sel;
+    this.active = ko.observable(false);
+};
+
+SearchItem.prototype.select = function() {
+    var changed = this.dim_sel.filter_item() !== this;
+    this.active(changed);
+
+    if (changed && this.dim_sel.filter_item()) {
+        this.dim_sel.filter_item().active(false);
+    }
+    this.dim_sel.filter_item(changed ? this : null);
+};
+
+
 var DimSelect = function(dataset, dim_name, dim_value, pivot) {
     this.dataset = dataset;
     this.selected_dim = ko.observable();
-    this.show_options = ko.observable(false);
+    this.card = ko.observable('main'); // can be 'filter' or 'option'
     this.dimensions = ko.observable();
     this.level_index = ko.observable(0);
     this.pivot = ko.observable(pivot);
@@ -215,10 +243,13 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         dataset.available_dimensions(),
         dim_name,
         dim_value);
+    this.search_results = ko.observable([]);
+    this.current_search = ko.observable('');
+    this.filter_item = ko.observable();
 
     this.choice = ko.computed(function() {
         var selected_dim = this.selected_dim();
-        if (selected_dim && selected_dim.selected_coord()){
+        if (selected_dim.selected_coord()){
             return selected_dim.choice();
         }
         return this.dimensions();
@@ -229,9 +260,14 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         return dim ? dim.label : '?';
     }.bind(this));
 
-    // Reset level index if active dimension change
     this.selected_dim.subscribe(function() {
+        // Reset level index if active dimension change
         this.level_index(0);
+        // Reset current_search
+        this.current_search('');
+        // Reset filter_item
+        this.filter_item() && this.filter_item().active(false);
+        this.filter_item(null);
     }.bind(this));
 
     // Update Levels
@@ -263,6 +299,58 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         this.head_levels(heads);
         this.tail_levels(tails);
     }.bind(this));
+
+    // Put search query in a computed to allow throttling
+    ko.computed(function() {
+        // Filter search results based on user input
+        var cs = this.current_search().trim();
+        if (!cs || !cs.length) {
+            this.search_results([]);
+            return;
+        }
+
+        var query = {
+            'space': this.dataset.measures()[0].space.name,
+            'dimension': this.selected_dim().name,
+            'value': cs,
+        }
+        query = JSON.stringify(query);
+
+        var url = '/mng/search.json?' +  $.param({'query': query});
+        $.get(url).then(function(resp) {
+            var results = []
+            for (var pos in resp.data) {
+                var name = resp.data[pos][0];
+                var depth = resp.data[pos][1];
+                var search_item = new SearchItem(name, depth, this);
+                results.push(search_item);
+            }
+
+            this.search_results(results);
+        }.bind(this));
+    }, this).extend({'throttle': 300});
+
+    this.search_results.subscribe(function() {
+        // Auto select matching item if results are updated
+        var fi = this.filter_item();
+        if (!fi) {
+            return;
+        }
+
+        var found = null;
+        var sr = this.search_results();
+        for (var pos in sr) {
+            if (fi.name == sr[pos].name && fi.depth == sr[pos].depth) {
+                found = true
+                sr[pos].select()
+                break;
+            }
+        }
+        if (!found) {
+            this.filter_item(null);
+        }
+    }.bind(this));
+
 };
 
 DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
@@ -290,18 +378,45 @@ DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
     // update clone with the correct value and return the
     // corresponding promise
     clone.activate();
-    var prm = clone.set_value(dim_value);
+    var prm = $.when();
+    if (dim_value) {
+        prm = clone.set_value(dim_value);
+    }
     return prm;
 };
 
-DimSelect.prototype.toggle_options = function(dim_select, ev) {
+DimSelect.prototype.get_filter_item = function() {
+    var fi = this.filter_item();
+    if (!fi) {
+        return null;
+    }
+    return [this.selected_dim().name, fi.name, fi.depth];
+};
+
+DimSelect.prototype.click_option = function(dim_select, ev) {
     // Show current collapsible
     var target = $(ev.target);
     var heading = target.parents('.panel-heading');
     var collapse = heading.next('.panel-collapse');
 
-    this.show_options(!this.show_options());
+    var test = this.card() != 'option' || !collapse.hasClass('in');
+    this.card(test ? 'option' : 'main');
     collapse.collapse('show');
+};
+
+DimSelect.prototype.click_search = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+
+    var test = this.card() != 'search' || !collapse.hasClass('in');
+    this.card(test ? 'search' : 'main');
+    collapse.collapse('show');
+};
+
+DimSelect.prototype.click_clear_search = function(dim_select, ev) {
+    this.current_search('');
 };
 
 DimSelect.prototype.drill_up = function(dim_select, ev) {
@@ -310,9 +425,9 @@ DimSelect.prototype.drill_up = function(dim_select, ev) {
     var heading = target.parents('.panel-heading');
     var collapse = heading.next('.panel-collapse');
     collapse.collapse('show');
-    // drill up and hide options
+    // drill up and force main card
     this.selected_dim().drill_up();
-    this.show_options(false);
+    this.card('main');
 };
 
 DimSelect.prototype.can_drill_up = function() {
@@ -489,7 +604,7 @@ DataSet.prototype.push_dim_select = function() {
         return ds.selected_dim().name;
     });
     var dim_name;
-    var dim_value = [null];
+    // var dim_value = [null];
     for (var pos in av) {
         var name = av[pos].name;
         if (currents.indexOf(name) < 0) {
@@ -498,7 +613,7 @@ DataSet.prototype.push_dim_select = function() {
         }
     }
 
-    var dsel = new DimSelect(this, dim_name, dim_value);
+    var dsel = new DimSelect(this, dim_name);
     this.dim_selects.push(dsel);
     return dsel;
 };
@@ -705,6 +820,9 @@ DataSet.prototype.refresh_state = function() {
         }),
         'skip_zero': this.active_view() == 'graph'? false : this.skip_zero(),
         'pivot_on': pivot_on,
+        'filters': dim_sels.map(function(dsel) {
+            return dsel.get_filter_item();
+        }).filter(identity),
     }
     this.json_state(JSON.stringify(this.state));
 
