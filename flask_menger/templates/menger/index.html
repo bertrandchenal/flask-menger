@@ -22,18 +22,18 @@
   <div class="col-sm-3 left-menu" data-bind="visible: show_menu">
     <h4>Measures</h4>
     <div class="panel-group" id="measures"
-         data-bind="template: {name: 'measure_tpl', foreach: measures}">
+         data-bind="template: {name: 'measure_tpl', foreach: msr_selects}">
     </div>
     <div class="btn-group">
       <button type="button" class="btn btn-default"
               title="Remove measure"
               data-bind="click: pop_measure,
-                         attr:{disabled: measures().length <= 1}">
+                         attr:{disabled: msr_selects().length <= 1}">
         <span class="glyphicon glyphicon-minus"></span>
       </button>
       <button type="button" class="btn btn-default"
               title="Add measure"
-              data-bind="click: push_measure">
+              data-bind="click: push_msr_select">
         <span class="glyphicon glyphicon-plus"></span>
       </button>
     </div>
@@ -163,21 +163,25 @@
   <div class="panel panel-default">
     <div class="panel-heading">
       <h4 class="panel-title">
+        <span data-bind="if: !on_top()">
+          <a class="glyphicon glyphicon-chevron-left"
+             data-bind="click: drill_up"></a>
+        </span>
         <a data-toggle="collapse" data-parent="#measures"
-           data-bind="attr: {href: '#collapse-measure-' + $index()}, text: fullname">
+           data-bind="attr: {href: '#collapse-measure-' + $index()},
+                      text: selected_spc().label">
         </a>
       </h4>
     </div>
     <div class="panel-collapse collapse"
          data-bind="attr: {id: 'collapse-measure-' + $index()}">
       <!-- <div class="panel-body"> -->
-      <div class="list-group menu-list" data-bind="foreach: $root.available_measures">
+      <div class="list-group menu-list" data-bind="foreach: choice()">
         <li class="list-group-item menu-item"
             data-bind="css: {active: $data === $parent}">
           <a href="#"
-             data-bind="text: fullname,
-                        click: $root.select_measure.bind(
-                        $root, $data, $parentContext.$index())">
+             data-bind="text: label,
+                        click: select">
           </a>
         </li>
       </div>
@@ -268,7 +272,7 @@
       </div>
 
       <div data-bind="if:card() == 'main'">
-        <ul class="list-group menu-list" data-bind="foreach:choice">
+        <ul class="list-group menu-list" data-bind="foreach: choice">
           <li class="list-group-item clearfix menu-item"
               data-bind="css: {active: active()}">
             <a href="#"

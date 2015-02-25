@@ -20,17 +20,103 @@ $.ajaxSetup({
     }
 });
 
-var Space = function(name, label) {
+var Space = function(name, label, msr_sel) {
     this.name = name;
     this.label = label;
+    this.msr_sel = msr_sel;
+    this.measures = [];
+};
+
+Space.prototype.select = function() {
+    this.msr_sel.selected_spc(this);
+    this.msr_sel.on_top(false);
+};
+
+Space.prototype.copy = function(msr_sel) {
+    var new_space = new Space(this.name, this.label, msr_sel);
+    var msrs = this.measures.map(function(m) {
+        var new_msr = m.copy(msr_sel);
+        new_msr.space = new_space;
+        return new_msr;
+    });
+    new_space.measures = msrs;
+    return new_space;
+};
+
+var Measure = function(space, name, label, msr_sel) {
+    this.space = space;
+    this.name = name;
+    this.label = label;
+    this.msr_sel = msr_sel;
+};
+
+Measure.prototype.select = function() {
+    this.msr_sel.selected_msr(this);
+};
+
+Measure.prototype.copy = function(msr_sel) {
+    return new Measure(this.space, this.name, this.label, msr_sel);
 };
 
 
-var Measure = function(space, name, label) {
-    this.space = space;
-    this.name = this.space.name + '.' + name;
-    this.label = label;
-    this.fullname = this.space.label +' / ' + this.label;
+var MsrSelect = function(dataset, spc_name, msr_name) {
+    this.dataset = dataset;
+    this.spaces = ko.observable([]);
+    this.selected_spc = ko.observable();
+    this.selected_msr = ko.observable();
+    this.on_top = ko.observable(false);
+    this.set_measure(dataset.available_spaces(), spc_name, msr_name);
+};
+
+MsrSelect.prototype.set_measure = function(available_spaces, spc_name, msr_name) {
+    var clones = available_spaces.map(function (s) {
+        return s.copy(this);
+    }.bind(this));
+    this.spaces(clones);
+
+    for (var i in clones) {
+        var spc = clones[i];
+        if (spc.name != spc_name) {
+            continue
+        }
+        this.selected_spc(spc);
+        for (var j in spc.measures) {
+            var msr = spc.measures[j];
+            if (msr.name == msr_name) {
+                this.selected_msr(msr);
+                return;
+            }
+        }
+    }
+
+    // not match found, pick first
+    if (!this.selected_spc()) {
+        this.selected_spc(clones[0]);
+    }
+    this.selected_msr(clones[0].measures[0]);
+};
+
+MsrSelect.prototype.choice = function() {
+    if (this.on_top()) {
+        return this.spaces();
+    }
+    return this.selected_spc().measures;
+};
+
+MsrSelect.prototype.full_name = function() {
+    if (!this.selected_msr()) {
+        return;
+    }
+    return this.selected_spc().name + '.' + this.selected_msr().name
+};
+
+MsrSelect.prototype.drill_up = function(msr_sel, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+    collapse.collapse('show');
+    this.on_top(true);
 };
 
 
@@ -45,7 +131,7 @@ var Coordinate = function(dimension, parent, value, label) {
 
 Coordinate.prototype.drill = function(value) {
     var query = {
-        'space': this.dimension.dimsel.dataset.measures()[0].space.name,
+        'space': this.dimension.dimsel.dataset.msr_selects()[0].selected_spc().name,
         'dimension': this.dimension.name,
         'value': this.value,
     }
@@ -310,7 +396,7 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         }
 
         var query = {
-            'space': this.dataset.measures()[0].space.name,
+            'space': this.dataset.msr_selects()[0].selected_spc().name,
             'dimension': this.selected_dim().name,
             'value': cs,
         }
@@ -489,8 +575,8 @@ Level.prototype.activate = function() {
 
 
 var DataSet = function(json_state) {
-    this.measures =  ko.observableArray([]);
-    this.available_measures = ko.observable([]);
+    this.msr_selects =  ko.observableArray([]);
+    this.available_spaces = ko.observable([]);
     this.dim_selects = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
     this.table_data = ko.observable();
@@ -530,7 +616,7 @@ var DataSet = function(json_state) {
         this.set_state(json_state);
     }.bind(this));
 
-    this.measures.subscribe(this.measures_changed.bind(this));
+    this.msr_selects.subscribe(this.msr_selects_changed.bind(this));
 
     // compute state
     ko.computed(this.refresh_state.bind(this)).extend({
@@ -624,27 +710,29 @@ DataSet.prototype.select_measure = function(selected, pos) {
     this.measures(msr);
 };
 
-DataSet.prototype.push_measure = function() {
-    var av = this.available_measures();
-    var currents = this.measures().map(function(m) {
-        return m.name;
+DataSet.prototype.push_msr_select = function() {
+
+    var currents = this.msr_selects().map(function(m) {
+        return m.selected_spc().name;
     });
 
-    // Search for a measure that is not already selected
+    // Search for a space that is not already selected
+    var av = this.available_spaces();
     for (var pos in av) {
         var name = av[pos].name;
+
         if (currents.indexOf(name) < 0) {
-            this.measures.push(av[pos]);
+            this.msr_selects.push(new MsrSelect(this, name));
             return;
         }
     }
 
     // Every measure already selected, pick the first
-    this.measures.push(av[0]);
+    this.msr_selects.push(new MsrSelect(this));
 };
 
 DataSet.prototype.pop_measure = function() {
-    this.measures.pop();
+    this.msr_selects.pop();
 };
 
 DataSet.prototype.pop_dim_select = function() {
@@ -653,7 +741,6 @@ DataSet.prototype.pop_dim_select = function() {
 
 DataSet.prototype.set_info = function(info) {
     var spaces = info.spaces;
-
     for (var pos in spaces) {
         var spc = spaces[pos]
         var dimensions = [];
@@ -665,15 +752,19 @@ DataSet.prototype.set_info = function(info) {
     }
 
     var measures = [];
+    var av_spaces = [];
     for (var pos in spaces) {
         var spc = spaces[pos];
         var space = new Space(spc.name, spc.label);
+        av_spaces.push(space);
         for (var pos in spc.measures) {
             var msr = spc.measures[pos];
-            measures.push(new Measure(space, msr.name, msr.label));
+            var new_measure = new Measure(space, msr.name, msr.label);
+            measures.push(new_measure);
+            space.measures.push(new_measure);
         }
     }
-    this.available_measures(measures);
+    this.available_spaces(av_spaces);
 };
 
 DataSet.prototype.get_dim_selects = function(dims) {
@@ -684,11 +775,17 @@ DataSet.prototype.get_dim_selects = function(dims) {
     }.bind(this));
 };
 
-DataSet.prototype.measures_changed = function(measures) {
-    var dimensions = DIM_CACHE[measures[0].space.name] || [];
+DataSet.prototype.msr_selects_changed = function() {
+    var sels = this.msr_selects();
+    if (!sels.length) {
+        return;
+    }
+
+    var dimensions = DIM_CACHE[sels[0].selected_spc().name] || [];
+
     // Filter dimensions that are available for all measures
-    for (var pos=1; pos < measures.length; pos++) {
-        var others = DIM_CACHE[measures[pos].space.name]
+    for (var pos=1; pos < sels.length; pos++) {
+        var others = DIM_CACHE[sels[pos].selected_spc().name]
         var unfiltered = dimensions.slice();
         dimensions = [];
         for (var x in unfiltered) {
@@ -714,15 +811,19 @@ DataSet.prototype.measures_changed = function(measures) {
 };
 
 DataSet.prototype.refresh_measures = function() {
-    var measures = [];
-    if (this.state.measures) {
-        measures = this.available_measures().filter(function(m) {
-            return this.state.measures.indexOf(m.name) >= 0;
-        }.bind(this));
-    } else if (this.available_measures().length) {
-         measures = [this.available_measures()[0]];
+    var msr_selects = [];
+    var measures = this.state.measures || [];
+    for (var pos in measures) {
+        var name =  measures[pos];
+        var spc_msr = name.split('.');
+        msr_selects.push(new MsrSelect(this, spc_msr[0], spc_msr[1]));
     }
-    this.measures(measures);
+    this.msr_selects(msr_selects);
+
+    // Force first measure if none selected
+    if (!msr_selects.length) {
+        this.push_msr_select();
+    }
 };
 
 DataSet.prototype.refresh_dimensions = function() {
@@ -799,8 +900,8 @@ DataSet.prototype.refresh_state = function() {
     }
 
     var dim_sels = this.dim_selects();
-    var msrs = this.measures();
-    if (!(dim_sels.length && msrs.length)) {
+    var msr_sels = this.msr_selects();
+    if (!(dim_sels.length && msr_sels.length)) {
         return;
     }
 
@@ -812,7 +913,9 @@ DataSet.prototype.refresh_state = function() {
     })
 
     this.state = {
-        'measures': msrs.map(function(m) {return m.name}),
+        'measures': msr_sels.map(function(m) {
+            return m.full_name();
+        }).filter(identity),
         'dimensions': dim_sels.map(function(dsel) {
             var dimension = dsel.selected_dim();
             var value = dimension.get_value();
