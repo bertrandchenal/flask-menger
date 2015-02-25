@@ -983,28 +983,6 @@ DataSet.prototype.get_xlsx = function() {
 
 
 var CHARTS = {};
-CHARTS.pie = {
-    'chart': function() {
-        return nv.models.pieChart()
-            .showLabels(true);
-    },
-    'graph_min_dim': 1,
-    'graph_max_dim': 2,
-    'nesting' : function(nest, nb_dim) {
-        switch(nb_dim) {
-        case 1:
-            nest.key(function(d) {return ""});
-            break;
-        case 2:
-            nest.key(function(d) {return d[1]});
-            break
-        }
-    },
-    'label': "Pie Chart",
-    'update': function(chart, nb_values, nb_dim) {
-        chart.showLegend(nb_values <= 6);
-    },
-};
 
 CHARTS.bar = {
     'chart': function() {
@@ -1039,6 +1017,30 @@ CHARTS.bar = {
         chart.showLegend(nb_dim != 1 && nb_values <= 6);
     },
 };
+
+CHARTS.pie = {
+    'chart': function() {
+        return nv.models.pieChart()
+            .showLabels(true);
+    },
+    'graph_min_dim': 1,
+    'graph_max_dim': 2,
+    'nesting' : function(nest, nb_dim) {
+        switch(nb_dim) {
+        case 1:
+            nest.key(function(d) {return ""});
+            break;
+        case 2:
+            nest.key(function(d) {return d[1]});
+            break
+        }
+    },
+    'label': "Pie Chart",
+    'update': function(chart, nb_values, nb_dim) {
+        chart.showLegend(nb_values <= 6);
+    },
+};
+
 
 var get_state = function() {
     try {
