@@ -66,6 +66,7 @@ var MsrSelect = function(dataset, spc_name, msr_name) {
     this.selected_msr = ko.observable();
     this.on_top = ko.observable(false);
     this.set_measure(dataset.available_spaces(), spc_name, msr_name);
+    this.card = ko.observable('main'); // can be 'option'
 };
 
 MsrSelect.prototype.set_measure = function(available_spaces, spc_name, msr_name) {
@@ -117,6 +118,56 @@ MsrSelect.prototype.drill_up = function(msr_sel, ev) {
     var collapse = heading.next('.panel-collapse');
     collapse.collapse('show');
     this.on_top(true);
+    this.card('main');
+};
+
+MsrSelect.prototype.click_option = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+
+    var test = this.card() != 'option' || !collapse.hasClass('in');
+    this.card(test ? 'option' : 'main');
+    collapse.collapse('show');
+};
+
+MsrSelect.prototype.move_up = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 1) {
+        return;
+    }
+    // Remove
+    msr_selects.splice(pos, 1);
+    // Re-add this one position before
+    msr_selects.splice(pos-1, 0, this);
+    this.dataset.msr_selects(msr_selects)
+};
+
+
+MsrSelect.prototype.move_down = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 0 || pos >= msr_selects.length - 1) {
+        return;
+    }
+    // Remove this
+    msr_selects.splice(pos, 1);
+    // Re-add this one position after
+    msr_selects.splice(pos+1, 0, this);
+    this.dataset.msr_selects(msr_selects)
+};
+
+MsrSelect.prototype.remove = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 0) {
+        return;
+    }
+    // Remove this
+    msr_selects.splice(pos, 1);
+    this.dataset.msr_selects(msr_selects)
 };
 
 

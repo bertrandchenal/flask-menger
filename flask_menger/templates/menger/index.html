@@ -171,21 +171,52 @@
            data-bind="attr: {href: '#collapse-measure-' + $index()},
                       text: selected_spc().label">
         </a>
+
+        <span class="pull-right">
+          <a class="glyphicon"
+             data-bind="click: click_option, css: {active: card() == 'option'}">
+            &#9776;
+          </a>
+        </span>
+
       </h4>
     </div>
     <div class="panel-collapse collapse"
-         data-bind="attr: {id: 'collapse-measure-' + $index()}">
-      <!-- <div class="panel-body"> -->
-      <div class="list-group menu-list" data-bind="foreach: choice()">
-        <li class="list-group-item menu-item"
-            data-bind="css: {active: $data === $parent}">
-          <a href="#"
-             data-bind="text: label,
-                        click: select">
-          </a>
-        </li>
+         data-bind="attr: {id: 'collapse-measure-' + $index()},
+                    css: {grey_bg: card() != 'main'}">
+
+      <div data-bind="if:card() == 'main'">
+        <div class="list-group menu-list" data-bind="foreach: choice()">
+          <li class="list-group-item menu-item"
+              data-bind="css: {active: $data === $parent}">
+            <a href="#"
+               data-bind="text: label,
+                          click: select">
+            </a>
+          </li>
+        </div>
       </div>
-      <!-- </div> -->
+
+      <div data-bind="if:card() == 'option'">
+        <div class="panel-body">
+          <h5>Move:</h5>
+          <div class="btn-group">
+            <button type="button" class="btn btn-default" title="Move up"
+                    data-bind="click: move_up">
+              <span class="glyphicon glyphicon-chevron-up"></span>
+            </button>
+            <button type="button" class="btn btn-default" title="Move down"
+                    data-bind="click: move_down">
+              <span class="glyphicon glyphicon-chevron-down"></span>
+            </button>
+            <button type="button" class="btn btn-default" title="Remove"
+                    data-bind="click: remove">
+              <span class="glyphicon glyphicon-remove"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </script>
