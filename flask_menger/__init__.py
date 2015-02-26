@@ -134,8 +134,8 @@ def mng(method, ext):
 
         try:
             res = do_dice(query, filters, ext)
-        except LimitException:
-            return json.jsonify(error='Request too big')
+        except LimitException as e:
+            return json.jsonify(error='Request too big (%s)'% str(e))
 
         if ext == 'xlsx':
             output_file = build_xlsx(res)
