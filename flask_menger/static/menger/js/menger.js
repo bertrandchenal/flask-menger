@@ -972,7 +972,7 @@ DataSet.prototype.refresh_state = function() {
             var value = dimension.get_value();
             return [dimension.name, value]
         }),
-        'skip_zero': this.active_view() == 'graph'? false : this.skip_zero(),
+        'skip_zero': this.skip_zero(),
         'pivot_on': pivot_on,
         'filters': dim_sels.map(function(dsel) {
             return dsel.get_filter_item();
