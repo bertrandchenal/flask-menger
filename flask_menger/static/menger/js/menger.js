@@ -367,7 +367,7 @@ SearchItem.prototype.select = function() {
 };
 
 
-var DimSelect = function(dataset, dim_name, dim_value, pivot) {
+var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
     this.dataset = dataset;
     this.selected_dim = ko.observable();
     this.card = ko.observable('main'); // can be 'filter' or 'option'
@@ -380,9 +380,17 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         dataset.available_dimensions(),
         dim_name,
         dim_value);
-    this.search_results = ko.observable([]);
-    this.current_search = ko.observable('');
-    this.filter_item = ko.observable();
+
+    var search_results = [], current_search = '', filter_item;
+    if (filter) {
+        filter_item = new SearchItem(filter[0], filter[1], this);
+        search_results = [filter_item];
+        current_search = filter[0];
+    }
+
+    this.search_results = ko.observable(search_results);
+    this.current_search = ko.observable(current_search);
+    this.filter_item = ko.observable(filter_item);
 
     this.choice = ko.computed(function() {
         var selected_dim = this.selected_dim();
@@ -818,11 +826,21 @@ DataSet.prototype.set_info = function(info) {
     this.available_spaces(av_spaces);
 };
 
-DataSet.prototype.get_dim_selects = function(dims) {
+DataSet.prototype.get_dim_selects = function(dims, filters) {
     var pivot_on = this.state.pivot_on || [];
+    var filter;
     return dims.map(function(d, pos) {
+
         var pivot = pivot_on.indexOf(pos) > -1;
-        return new DimSelect(this, d[0], d[1], pivot);
+        var filter_name = filters && filters.length && filters[0][0];
+        if (filter_name && filter_name == d[0]) {
+            filter = filters.shift(); // match found 'pop' it from the list
+            filter.shift(); // Remove dimension name
+        } else {
+            filter = null;
+        }
+
+        return new DimSelect(this, d[0], d[1], pivot, filter);
     }.bind(this));
 };
 
@@ -915,11 +933,12 @@ DataSet.prototype.refresh_dimensions = function() {
 
     // .. if not, build them based on current state
     var state_dimensions = this.state.dimensions || [];
+    var state_filters = this.state.filters || [];
     state_dimensions = state_dimensions.filter(function(n) {
         return n[0] in availables;
     });
     if (state_dimensions.length) {
-        var dim_selects = this.get_dim_selects(state_dimensions);
+        var dim_selects = this.get_dim_selects(state_dimensions, state_filters);
         // update this.dim_selects only when all are ready
         var prms = dim_selects.map(function(d) {return d.prm});
         $.when.apply(this, prms).then(function() {
