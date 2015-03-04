@@ -122,27 +122,27 @@ def mng(method, ext):
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
-        # Add user filters to the permission one
-        query_filters = query.get('filters', [])
-        measures = query['measures']
-        spc_name = measures[0].split('.')[0]
-        spc = get_space(spc_name)
-        for dim_name, filter_val, depth in query_filters:
-            dim = getattr(spc, dim_name)
-            coord = (None,) * (depth-1) + (filter_val,)
-            filters.append((dim_name, dim.glob(coord)))
+        with connect(current_app.config['MENGER_DATABASE']):
+            # Add user filters to the permission one
+            query_filters = query.get('filters', [])
+            measures = query['measures']
+            spc_name = measures[0].split('.')[0]
+            spc = get_space(spc_name)
+            for dim_name, filter_val, depth in query_filters:
+                dim = getattr(spc, dim_name)
+                coord = (None,) * (depth-1) + (filter_val,)
+                filters.append((dim_name, list(dim.glob(coord))))
+            try:
+                res = do_dice(query, filters, ext)
+            except LimitException as e:
+                return json.jsonify(error='Request too big (%s)'% str(e))
 
-        try:
-            res = do_dice(query, filters, ext)
-        except LimitException as e:
-            return json.jsonify(error='Request too big (%s)'% str(e))
-
-        if ext == 'xlsx':
-            output_file = build_xlsx(res)
-            attachment_filename = compute_filename(
-                current_app.config['MENGER_EXPORT_PATTERN'])
-            return send_file(output_file, as_attachment=True,
-                     attachment_filename=attachment_filename)
+            if ext == 'xlsx':
+                output_file = build_xlsx(res)
+                attachment_filename = compute_filename(
+                    current_app.config['MENGER_EXPORT_PATTERN'])
+                return send_file(output_file, as_attachment=True,
+                         attachment_filename=attachment_filename)
 
     else:
         return ('Unknown method "%s"' % method, 404)
@@ -208,14 +208,14 @@ def do_dice(query, filters, ext, limit=None):
 
     skip_zero = query.get('skip_zero')
     pivot_on = query.get('pivot_on')
-    with connect(current_app.config['MENGER_DATABASE']):
-        return dice(dimensions, measures,
-                    format_type=ext,
-                    filters=filters,
-                    skip_zero=skip_zero,
-                    pivot_on=pivot_on,
-                    limit=limit,
-        )
+
+    return dice(dimensions, measures,
+                format_type=ext,
+                filters=filters,
+                skip_zero=skip_zero,
+                pivot_on=pivot_on,
+                limit=limit,
+            )
 
 def compute_filename(pattern):
     now = datetime.datetime.now()

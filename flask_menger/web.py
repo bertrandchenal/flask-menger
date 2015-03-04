@@ -201,7 +201,9 @@ def dice(coordinates, measures, **options):
     dimensions = [get_dimension(spc, d) for d, v in coordinates]
 
     # Query DB
-    drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
+    dim_filters = lambda name: [v for d,v in filters if d == name]
+    drills = [sorted(get_dimension(spc, d).glob(v, dim_filters(d))) \
+              for d, v in coordinates]
     if nb_combination(drills) > MAX_COMBINATION:
         raise LimitException('Number of requested combination is too large')
     data_dict = dice_by_msr(coordinates, measures, filters=filters, limit=limit)
