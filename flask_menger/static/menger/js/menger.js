@@ -385,7 +385,7 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
     if (filter) {
         filter_item = new SearchItem(filter[0], filter[1], this);
         search_results = [filter_item];
-        current_search = filter[0];
+        current_search = String(filter[0]);
     }
 
     this.search_results = ko.observable(search_results);
