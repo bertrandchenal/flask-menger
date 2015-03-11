@@ -6,7 +6,6 @@ import os
 
 from menger import Dimension, Measure, get_space
 
-MAX_COMBINATION = 10**6
 DEFAULT_LIMIT = 10**5
 
 logger = logging.getLogger('menger.flask')
@@ -179,7 +178,7 @@ def dice(coordinates, measures, **options):
     format_type = options.get('format_type')
     filters = options.get('filters')
     skip_zero = options.get('skip_zero')
-    limit = options.get('limit') or DEFAULT_LIMIT
+    limit = options.get('limit', DEFAULT_LIMIT)
 
     if format_type == 'txt':
         pivot_on = options.get('pivot_on', [])
@@ -217,9 +216,6 @@ def dice(coordinates, measures, **options):
 
     # Query DB
     drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
-
-    if nb_combination(drills) > MAX_COMBINATION:
-        raise LimitException('Number of requested combination is too large')
     data_dict = dice_by_msr(coordinates, measures, filters=filters, limit=limit)
 
     # Apply mask on drill values if the same dimension appear several
