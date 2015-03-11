@@ -316,18 +316,21 @@ def dice_by_msr(coordinates, measures, filters=None, limit=None):
                      lambda x: x[0])
     data = defaultdict(lambda: [0 for _ in measures])
     key_len = len(coordinates)
-    for spc_pos, (spc_name, msrs) in enumerate(spc_msr):
+    spc_offset = 0
+    for spc_name, grouped_msrs in spc_msr:
         spc = get_space(spc_name)
         if not spc:
             raise Exception('space "%s" not found' % spc_name)
 
+        msrs = [m[1] for m in grouped_msrs]
         filters = filters or {}
-        results = spc.dice(coordinates, (m[1] for m in msrs), filters)
+        results = spc.dice(coordinates, msrs, filters)
         for key, vals in results:
             if limit is not None and len(data) > limit:
                 raise LimitException('Size limit reached')
             for pos, val in enumerate(vals):
-                data[key][spc_pos + pos] = val
+                data[key][spc_offset + pos] = val
+        spc_offset += len(msrs)
     return data
 
 
