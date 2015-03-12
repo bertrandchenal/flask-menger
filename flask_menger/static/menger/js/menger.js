@@ -7,6 +7,9 @@ var MAX_DATA = 10;
 var DRILL_CACHE = {};
 var PAGE_LENGTH = 100;
 
+// Simple helper
+var identity = function(x) {return x;}
+
 // Force waiting cursor when an ajax call is in progress
 $.ajaxSetup({
     'beforeSend': function(jqXHR, settings) {
@@ -17,17 +20,154 @@ $.ajaxSetup({
     }
 });
 
-var Space = function(name, label) {
+var Space = function(name, label, msr_sel) {
     this.name = name;
     this.label = label;
+    this.msr_sel = msr_sel;
+    this.measures = [];
+};
+
+Space.prototype.select = function() {
+    this.msr_sel.selected_spc(this);
+    this.msr_sel.on_top(false);
+};
+
+Space.prototype.copy = function(msr_sel) {
+    var new_space = new Space(this.name, this.label, msr_sel);
+    var msrs = this.measures.map(function(m) {
+        var new_msr = m.copy(msr_sel);
+        new_msr.space = new_space;
+        return new_msr;
+    });
+    new_space.measures = msrs;
+    return new_space;
+};
+
+var Measure = function(space, name, label, msr_sel) {
+    this.space = space;
+    this.name = name;
+    this.label = label;
+    this.msr_sel = msr_sel;
+};
+
+Measure.prototype.select = function() {
+    this.msr_sel.selected_msr(this);
+};
+
+Measure.prototype.copy = function(msr_sel) {
+    return new Measure(this.space, this.name, this.label, msr_sel);
 };
 
 
-var Measure = function(space, name, label) {
-    this.space = space;
-    this.name = this.space.name + '.' + name;
-    this.label = label;
-    this.fullname = this.space.label +' / ' + this.label;
+var MsrSelect = function(dataset, spc_name, msr_name) {
+    this.dataset = dataset;
+    this.spaces = ko.observable([]);
+    this.selected_spc = ko.observable();
+    this.selected_msr = ko.observable();
+    this.on_top = ko.observable(false);
+    this.set_measure(dataset.available_spaces(), spc_name, msr_name);
+    this.card = ko.observable('main'); // can be 'option'
+};
+
+MsrSelect.prototype.set_measure = function(available_spaces, spc_name, msr_name) {
+    var clones = available_spaces.map(function (s) {
+        return s.copy(this);
+    }.bind(this));
+    this.spaces(clones);
+
+    for (var i in clones) {
+        var spc = clones[i];
+        if (spc.name != spc_name) {
+            continue
+        }
+        this.selected_spc(spc);
+        for (var j in spc.measures) {
+            var msr = spc.measures[j];
+            if (msr.name == msr_name) {
+                this.selected_msr(msr);
+                return;
+            }
+        }
+    }
+
+    // not match found, pick first
+    if (!this.selected_spc()) {
+        this.selected_spc(clones[0]);
+    }
+    this.selected_msr(clones[0].measures[0]);
+};
+
+MsrSelect.prototype.choice = function() {
+    if (this.on_top()) {
+        return this.spaces();
+    }
+    return this.selected_spc().measures;
+};
+
+MsrSelect.prototype.full_name = function() {
+    if (!this.selected_msr()) {
+        return;
+    }
+    return this.selected_spc().name + '.' + this.selected_msr().name
+};
+
+MsrSelect.prototype.drill_up = function(msr_sel, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+    collapse.collapse('show');
+    this.on_top(true);
+    this.card('main');
+};
+
+MsrSelect.prototype.click_option = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+
+    var test = this.card() != 'option' || !collapse.hasClass('in');
+    this.card(test ? 'option' : 'main');
+    collapse.collapse('show');
+};
+
+MsrSelect.prototype.move_up = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 1) {
+        return;
+    }
+    // Remove
+    msr_selects.splice(pos, 1);
+    // Re-add this one position before
+    msr_selects.splice(pos-1, 0, this);
+    this.dataset.msr_selects(msr_selects)
+};
+
+
+MsrSelect.prototype.move_down = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 0 || pos >= msr_selects.length - 1) {
+        return;
+    }
+    // Remove this
+    msr_selects.splice(pos, 1);
+    // Re-add this one position after
+    msr_selects.splice(pos+1, 0, this);
+    this.dataset.msr_selects(msr_selects)
+};
+
+MsrSelect.prototype.remove = function() {
+    var msr_selects = this.dataset.msr_selects();
+    var pos = msr_selects.indexOf(this)
+    if (pos < 0) {
+        return;
+    }
+    // Remove this
+    msr_selects.splice(pos, 1);
+    this.dataset.msr_selects(msr_selects)
 };
 
 
@@ -42,7 +182,7 @@ var Coordinate = function(dimension, parent, value, label) {
 
 Coordinate.prototype.drill = function(value) {
     var query = {
-        'space': this.dimension.dimsel.dataset.measures()[0].space.name,
+        'space': this.dimension.dimsel.dataset.msr_selects()[0].selected_spc().name,
         'dimension': this.dimension.name,
         'value': this.value,
     }
@@ -95,15 +235,18 @@ Coordinate.prototype.has_children = function() {
     return this.value.length < this.dimension.levels().length;
 };
 
-Coordinate.prototype.set_value = function(value, offset) {
+Coordinate.prototype.set_value = function(value) {
     if (!value || !value.length) {
         return;
     }
-    offset = offset || 0;
 
     var prm = this.drill();
     if (!value[0]) {
-        this.dimension.dimsel.level_index(value.length + offset - 1);
+        // If level as been selected enforce it, else select root level
+        var l = value.length;
+        var idx =  l > 1 ? l-1 : 0;
+        this.dimension.dimsel.level_index(idx);
+
         prm.then(function() {
             this.dimension.selected_coord(this);
         }.bind(this));
@@ -117,9 +260,10 @@ Coordinate.prototype.set_value = function(value, offset) {
             if (last_val != value[0]) {
                 continue;
             }
+
             value = value.splice(1);
             if (value.length) {
-                return child.set_value(value, offset + 1);
+                return child.set_value(value);
             }
             child.activate();
             break;
@@ -139,6 +283,9 @@ var Dimension = function(name, label, levels, dimsel) {
 };
 
 Dimension.prototype.choice = function() {
+    if (!this.selected_coord()) {
+        return [];
+    }
     return this.selected_coord().children;
 };
 
@@ -154,7 +301,7 @@ Dimension.prototype.drill = function() {
 };
 
 Dimension.prototype.activate = function() {
-    var old = this.dimsel.selected_dim()
+    var old = this.dimsel.selected_dim();
     old && old.active(false);
     this.dimsel.selected_dim(this);
     this.active(true);
@@ -178,7 +325,8 @@ Dimension.prototype.set_value = function(value) {
 }
 
 Dimension.prototype.get_value = function() {
-    var coord = this.selected_coord();
+    var coord = this.selected_coord() || new Coordinate(this, null, []);
+
     if (coord) {
         var actives = this.choice().filter(function(d) {
             return d.active();
@@ -198,10 +346,31 @@ Dimension.prototype.get_value = function() {
     return [null];
 };
 
-var DimSelect = function(dataset, dim_name, dim_value, pivot) {
+// Small object to hold a search result used when the user filter on
+// the dimension
+var SearchItem = function(name, depth, dim_sel) {
+    this.name = name;
+    this.depth = depth;
+    this.level = dim_sel.selected_dim().levels()[depth - 1];
+    this.dim_sel = dim_sel;
+    this.active = ko.observable(false);
+};
+
+SearchItem.prototype.select = function() {
+    var changed = this.dim_sel.filter_item() !== this;
+    this.active(changed);
+
+    if (changed && this.dim_sel.filter_item()) {
+        this.dim_sel.filter_item().active(false);
+    }
+    this.dim_sel.filter_item(changed ? this : null);
+};
+
+
+var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
     this.dataset = dataset;
     this.selected_dim = ko.observable();
-    this.show_options = ko.observable(false);
+    this.card = ko.observable('main'); // can be 'filter' or 'option'
     this.dimensions = ko.observable();
     this.level_index = ko.observable(0);
     this.pivot = ko.observable(pivot);
@@ -212,9 +381,20 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         dim_name,
         dim_value);
 
+    var search_results = [], current_search = '', filter_item;
+    if (filter) {
+        filter_item = new SearchItem(filter[0], filter[1], this);
+        search_results = [filter_item];
+        current_search = String(filter[0]);
+    }
+
+    this.search_results = ko.observable(search_results);
+    this.current_search = ko.observable(current_search);
+    this.filter_item = ko.observable(filter_item);
+
     this.choice = ko.computed(function() {
         var selected_dim = this.selected_dim();
-        if (selected_dim && selected_dim.selected_coord()){
+        if (selected_dim.selected_coord()){
             return selected_dim.choice();
         }
         return this.dimensions();
@@ -225,9 +405,14 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         return dim ? dim.label : '?';
     }.bind(this));
 
-    // Reset level index if active dimension change
     this.selected_dim.subscribe(function() {
+        // Reset level index if active dimension change
         this.level_index(0);
+        // Reset current_search
+        this.current_search('');
+        // Reset filter_item
+        this.filter_item() && this.filter_item().active(false);
+        this.filter_item(null);
     }.bind(this));
 
     // Update Levels
@@ -259,6 +444,58 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot) {
         this.head_levels(heads);
         this.tail_levels(tails);
     }.bind(this));
+
+    // Put search query in a computed to allow throttling
+    ko.computed(function() {
+        // Filter search results based on user input
+        var cs = this.current_search().trim();
+        if (!cs || !cs.length) {
+            this.search_results([]);
+            return;
+        }
+
+        var query = {
+            'space': this.dataset.msr_selects()[0].selected_spc().name,
+            'dimension': this.selected_dim().name,
+            'value': cs,
+        }
+        query = JSON.stringify(query);
+
+        var url = '/mng/search.json?' +  $.param({'query': query});
+        $.get(url).then(function(resp) {
+            var results = []
+            for (var pos in resp.data) {
+                var name = resp.data[pos][0];
+                var depth = resp.data[pos][1];
+                var search_item = new SearchItem(name, depth, this);
+                results.push(search_item);
+            }
+
+            this.search_results(results);
+        }.bind(this));
+    }, this).extend({'throttle': 300});
+
+    this.search_results.subscribe(function() {
+        // Auto select matching item if results are updated
+        var fi = this.filter_item();
+        if (!fi) {
+            return;
+        }
+
+        var found = null;
+        var sr = this.search_results();
+        for (var pos in sr) {
+            if (fi.name == sr[pos].name && fi.depth == sr[pos].depth) {
+                found = true
+                sr[pos].select()
+                break;
+            }
+        }
+        if (!found) {
+            this.filter_item(null);
+        }
+    }.bind(this));
+
 };
 
 DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
@@ -286,18 +523,45 @@ DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
     // update clone with the correct value and return the
     // corresponding promise
     clone.activate();
-    var prm = clone.set_value(dim_value);
+    var prm = $.when();
+    if (dim_value) {
+        prm = clone.set_value(dim_value);
+    }
     return prm;
 };
 
-DimSelect.prototype.toggle_options = function(dim_select, ev) {
+DimSelect.prototype.get_filter_item = function() {
+    var fi = this.filter_item();
+    if (!fi) {
+        return null;
+    }
+    return [this.selected_dim().name, fi.name, fi.depth];
+};
+
+DimSelect.prototype.click_option = function(dim_select, ev) {
     // Show current collapsible
     var target = $(ev.target);
     var heading = target.parents('.panel-heading');
     var collapse = heading.next('.panel-collapse');
 
-    this.show_options(!this.show_options());
+    var test = this.card() != 'option' || !collapse.hasClass('in');
+    this.card(test ? 'option' : 'main');
     collapse.collapse('show');
+};
+
+DimSelect.prototype.click_search = function(dim_select, ev) {
+    // Show current collapsible
+    var target = $(ev.target);
+    var heading = target.parents('.panel-heading');
+    var collapse = heading.next('.panel-collapse');
+
+    var test = this.card() != 'search' || !collapse.hasClass('in');
+    this.card(test ? 'search' : 'main');
+    collapse.collapse('show');
+};
+
+DimSelect.prototype.click_clear_search = function(dim_select, ev) {
+    this.current_search('');
 };
 
 DimSelect.prototype.drill_up = function(dim_select, ev) {
@@ -306,9 +570,9 @@ DimSelect.prototype.drill_up = function(dim_select, ev) {
     var heading = target.parents('.panel-heading');
     var collapse = heading.next('.panel-collapse');
     collapse.collapse('show');
-    // drill up and hide options
+    // drill up and force main card
     this.selected_dim().drill_up();
-    this.show_options(false);
+    this.card('main');
 };
 
 DimSelect.prototype.can_drill_up = function() {
@@ -358,22 +622,20 @@ var Level = function(name, index, dimsel) {
     this.index = index;
     this.dimsel = dimsel;
 
-    if (dimsel.level_index() == index) {
-        this.active = true;
-    } else {
-        this.active = false;
-    }
+    this.active = ko.computed(function() {
+        return dimsel.level_index() == index;
+    })
 };
 
 Level.prototype.activate = function() {
-    this.active = true;
-    this.dimsel.level_index(this.index);
+    var idx = this.index == this.dimsel.level_index() ? 0 : this.index;
+    this.dimsel.level_index(idx);
 };
 
 
 var DataSet = function(json_state) {
-    this.measures =  ko.observableArray([]);
-    this.available_measures = ko.observable([]);
+    this.msr_selects =  ko.observableArray([]);
+    this.available_spaces = ko.observable([]);
     this.dim_selects = ko.observableArray([]);
     this.available_dimensions = ko.observable([]);
     this.table_data = ko.observable();
@@ -413,8 +675,7 @@ var DataSet = function(json_state) {
         this.set_state(json_state);
     }.bind(this));
 
-    this.measures.subscribe(this.measures_changed.bind(this));
-
+    this.msr_selects.subscribe(this.msr_selects_changed.bind(this));
 
     // compute state
     ko.computed(this.refresh_state.bind(this)).extend({
@@ -488,7 +749,7 @@ DataSet.prototype.push_dim_select = function() {
         return ds.selected_dim().name;
     });
     var dim_name;
-    var dim_value = [null];
+    // var dim_value = [null];
     for (var pos in av) {
         var name = av[pos].name;
         if (currents.indexOf(name) < 0) {
@@ -497,7 +758,7 @@ DataSet.prototype.push_dim_select = function() {
         }
     }
 
-    var dsel = new DimSelect(this, dim_name, dim_value);
+    var dsel = new DimSelect(this, dim_name);
     this.dim_selects.push(dsel);
     return dsel;
 };
@@ -508,27 +769,29 @@ DataSet.prototype.select_measure = function(selected, pos) {
     this.measures(msr);
 };
 
-DataSet.prototype.push_measure = function() {
-    var av = this.available_measures();
-    var currents = this.measures().map(function(m) {
-        return m.name;
+DataSet.prototype.push_msr_select = function() {
+
+    var currents = this.msr_selects().map(function(m) {
+        return m.selected_spc().name;
     });
 
-    // Search for a measure that is not already selected
+    // Search for a space that is not already selected
+    var av = this.available_spaces();
     for (var pos in av) {
         var name = av[pos].name;
+
         if (currents.indexOf(name) < 0) {
-            this.measures.push(av[pos]);
+            this.msr_selects.push(new MsrSelect(this, name));
             return;
         }
     }
 
     // Every measure already selected, pick the first
-    this.measures.push(av[0]);
+    this.msr_selects.push(new MsrSelect(this));
 };
 
 DataSet.prototype.pop_measure = function() {
-    this.measures.pop();
+    this.msr_selects.pop();
 };
 
 DataSet.prototype.pop_dim_select = function() {
@@ -537,7 +800,6 @@ DataSet.prototype.pop_dim_select = function() {
 
 DataSet.prototype.set_info = function(info) {
     var spaces = info.spaces;
-
     for (var pos in spaces) {
         var spc = spaces[pos]
         var dimensions = [];
@@ -549,30 +811,50 @@ DataSet.prototype.set_info = function(info) {
     }
 
     var measures = [];
+    var av_spaces = [];
     for (var pos in spaces) {
         var spc = spaces[pos];
         var space = new Space(spc.name, spc.label);
+        av_spaces.push(space);
         for (var pos in spc.measures) {
             var msr = spc.measures[pos];
-            measures.push(new Measure(space, msr.name, msr.label));
+            var new_measure = new Measure(space, msr.name, msr.label);
+            measures.push(new_measure);
+            space.measures.push(new_measure);
         }
     }
-    this.available_measures(measures);
+    this.available_spaces(av_spaces);
 };
 
-DataSet.prototype.get_dim_selects = function(dims) {
+DataSet.prototype.get_dim_selects = function(dims, filters) {
     var pivot_on = this.state.pivot_on || [];
+    var filter;
     return dims.map(function(d, pos) {
+
         var pivot = pivot_on.indexOf(pos) > -1;
-        return new DimSelect(this, d[0], d[1], pivot);
+        var filter_name = filters && filters.length && filters[0][0];
+        if (filter_name && filter_name == d[0]) {
+            filter = filters.shift(); // match found 'pop' it from the list
+            filter.shift(); // Remove dimension name
+        } else {
+            filter = null;
+        }
+
+        return new DimSelect(this, d[0], d[1], pivot, filter);
     }.bind(this));
 };
 
-DataSet.prototype.measures_changed = function(measures) {
-    var dimensions = DIM_CACHE[measures[0].space.name] || [];
+DataSet.prototype.msr_selects_changed = function() {
+    var sels = this.msr_selects();
+    if (!sels.length) {
+        return;
+    }
+
+    var dimensions = DIM_CACHE[sels[0].selected_spc().name] || [];
+
     // Filter dimensions that are available for all measures
-    for (var pos=1; pos < measures.length; pos++) {
-        var others = DIM_CACHE[measures[pos].space.name]
+    for (var pos=1; pos < sels.length; pos++) {
+        var others = DIM_CACHE[sels[pos].selected_spc().name]
         var unfiltered = dimensions.slice();
         dimensions = [];
         for (var x in unfiltered) {
@@ -598,15 +880,19 @@ DataSet.prototype.measures_changed = function(measures) {
 };
 
 DataSet.prototype.refresh_measures = function() {
-    var measures = [];
-    if (this.state.measures) {
-        measures = this.available_measures().filter(function(m) {
-            return this.state.measures.indexOf(m.name) >= 0;
-        }.bind(this));
-    } else if (this.available_measures().length) {
-         measures = [this.available_measures()[0]];
+    var msr_selects = [];
+    var measures = this.state.measures || [];
+    for (var pos in measures) {
+        var name =  measures[pos];
+        var spc_msr = name.split('.');
+        msr_selects.push(new MsrSelect(this, spc_msr[0], spc_msr[1]));
     }
-    this.measures(measures);
+    this.msr_selects(msr_selects);
+
+    // Force first measure if none selected
+    if (!msr_selects.length) {
+        this.push_msr_select();
+    }
 };
 
 DataSet.prototype.refresh_dimensions = function() {
@@ -647,11 +933,12 @@ DataSet.prototype.refresh_dimensions = function() {
 
     // .. if not, build them based on current state
     var state_dimensions = this.state.dimensions || [];
+    var state_filters = this.state.filters || [];
     state_dimensions = state_dimensions.filter(function(n) {
         return n[0] in availables;
     });
     if (state_dimensions.length) {
-        var dim_selects = this.get_dim_selects(state_dimensions);
+        var dim_selects = this.get_dim_selects(state_dimensions, state_filters);
         // update this.dim_selects only when all are ready
         var prms = dim_selects.map(function(d) {return d.prm});
         $.when.apply(this, prms).then(function() {
@@ -683,8 +970,8 @@ DataSet.prototype.refresh_state = function() {
     }
 
     var dim_sels = this.dim_selects();
-    var msrs = this.measures();
-    if (!(dim_sels.length && msrs.length)) {
+    var msr_sels = this.msr_selects();
+    if (!(dim_sels.length && msr_sels.length)) {
         return;
     }
 
@@ -696,14 +983,19 @@ DataSet.prototype.refresh_state = function() {
     })
 
     this.state = {
-        'measures': msrs.map(function(m) {return m.name}),
+        'measures': msr_sels.map(function(m) {
+            return m.full_name();
+        }).filter(identity),
         'dimensions': dim_sels.map(function(dsel) {
             var dimension = dsel.selected_dim();
             var value = dimension.get_value();
             return [dimension.name, value]
         }),
-        'skip_zero': this.active_view() == 'graph'? false : this.skip_zero(),
+        'skip_zero': this.skip_zero(),
         'pivot_on': pivot_on,
+        'filters': dim_sels.map(function(dsel) {
+            return dsel.get_filter_item();
+        }).filter(identity),
     }
     this.json_state(JSON.stringify(this.state));
 
@@ -730,10 +1022,12 @@ DataSet.prototype.refresh_state = function() {
     } else if (this.active_view() == 'graph') {
 
         var chart_type = this.chart_type();
+        var chart_class = CHARTS[chart_type];
         prm.then(function(res) {
             this.cache_data(url, res);
             // Pick chart
-            var graph_nb_dim = CHARTS[chart_type].graph_nb_dim;
+            var graph_min_dim = chart_class.graph_min_dim;
+            var graph_max_dim = chart_class.graph_max_dim;
 
             // Count dimensions
             var nb_dim = 0;
@@ -748,10 +1042,10 @@ DataSet.prototype.refresh_state = function() {
 
             // Show error if dimension number mismatch
             var vis = $("#vis");
-            if (nb_dim > graph_nb_dim + 1) {
+            if (nb_dim > graph_max_dim) {
                 vis.html('<p>Too many dimensions</p>')
                 return;
-            } else if (nb_dim < graph_nb_dim) {
+            } else if (nb_dim < graph_min_dim) {
                 vis.html('<p>Not enough dimensions</p>')
                 return;
             } else {
@@ -761,9 +1055,9 @@ DataSet.prototype.refresh_state = function() {
             // Wrapper to instanciate new chart (and not reuse the
             // same instance)
             var get_chart = function() {
-                var chart = CHARTS[chart_type].chart();
-                chart.x(function(d) {return d[0] })
-                    .y(function(d) {return d[nb_dim] });
+                var chart = chart_class.chart();
+                chart.x(function(d) {return d[0]})
+                    .y(function(d) {return d[nb_dim]});
 
                 this.show_menu.subscribe(function() {chart.update()});
                 return chart;
@@ -772,7 +1066,7 @@ DataSet.prototype.refresh_state = function() {
 
             // Nest on extra dimensions
             var nest = d3.nest();
-            CHARTS[chart_type].nesting(nest, nb_dim);
+            chart_class.nesting(nest, nb_dim);
             var data = nest.entries(res.data);
 
             // Define nested charts
@@ -801,11 +1095,7 @@ DataSet.prototype.refresh_state = function() {
                         $(this).find ('.nv-legendWrap').empty()
                     }
                     var chart = get_chart();
-                    if (d.values.length > 6) {
-                        chart.showLegend(false);
-                    } else {
-                        chart.showLegend(true);
-                    }
+                    chart_class.update(chart, d.values.length, nb_dim);
                     d3.select(this).datum(d.values)
                         .transition().duration(500)
                         .call(chart);
@@ -831,7 +1121,14 @@ DataSet.prototype.refresh_state = function() {
 
 
 DataSet.prototype.dice_url = function(ext) {
-    return '/mng/dice.' + ext + '?' +  $.param({'query': this.json_state()});
+    var json_state = this.json_state();
+    // enforce full output for graphs
+    if (this.active_view() == 'graph') {
+        var state = JSON.parse(json_state)
+        state.skip_zero = false;
+        json_state = JSON.stringify(state);
+    }
+    return '/mng/dice.' + ext + '?' +  $.param({'query': json_state});
 }
 
 
@@ -866,24 +1163,6 @@ DataSet.prototype.get_xlsx = function() {
 
 
 var CHARTS = {};
-CHARTS.pie = {
-    'chart': function() {
-        return nv.models.pieChart()
-            .showLabels(true);
-    },
-    'graph_nb_dim': 1,
-    'nesting' : function(nest, nb_dim) {
-        switch(nb_dim) {
-        case 1:
-            nest.key(function(d) {return ""});
-            break;
-        case 2:
-            nest.key(function(d) {return d[1]});
-            break
-        }
-    },
-    'label': "Pie Chart",
-}
 
 CHARTS.bar = {
     'chart': function() {
@@ -895,9 +1174,14 @@ CHARTS.bar = {
             .tickFormat(d3.format('.3s'));
         return chart;
     },
-    'graph_nb_dim': 2,
+    'graph_min_dim': 1,
+    'graph_max_dim': 3,
     'nesting' : function(nest, nb_dim) {
         switch(nb_dim) {
+        case 1:
+            nest.key(function(d) {return ""});
+            nest.key(function(d) {return ""});
+            break;
         case 2:
             nest.key(function(d) {return ""});
             nest.key(function(d) {return d[1]});
@@ -909,7 +1193,34 @@ CHARTS.bar = {
         }
     },
     'label': "Bar Chart",
-}
+    'update': function(chart, nb_values, nb_dim) {
+        chart.showLegend(nb_dim != 1 && nb_values <= 6);
+    },
+};
+
+CHARTS.pie = {
+    'chart': function() {
+        return nv.models.pieChart()
+            .showLabels(true);
+    },
+    'graph_min_dim': 1,
+    'graph_max_dim': 2,
+    'nesting' : function(nest, nb_dim) {
+        switch(nb_dim) {
+        case 1:
+            nest.key(function(d) {return ""});
+            break;
+        case 2:
+            nest.key(function(d) {return d[1]});
+            break
+        }
+    },
+    'label': "Pie Chart",
+    'update': function(chart, nb_values, nb_dim) {
+        chart.showLegend(nb_values <= 6);
+    },
+};
+
 
 var get_state = function() {
     try {

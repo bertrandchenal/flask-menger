@@ -1,5 +1,6 @@
-import datetime
 from hashlib import md5
+import datetime
+import gzip
 
 from flask import (current_app, Blueprint, render_template, request, json,
                    send_file)
@@ -7,48 +8,23 @@ from flask.ext.login import login_required
 from menger import connect, get_space, iter_spaces, register
 
 from flask_menger.web import build_xlsx, dice, LimitException
+from flask_menger.util import DummyCache, FSCache
 
+fs_cache = DummyCache()
 menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
 
 
-class LRU:
-
-    def __init__(self, size=1000):
-        self.fresh = {}
-        self.stale = {}
-        self.size = size
-
-    def get(self, key, default=None):
-        if key in self.fresh:
-            return self.fresh[key]
-
-        if key in self.stale:
-            value = self.stale[key]
-            # Promote key to fresh dict
-            self.set(key, value)
-            return value
-        return default
-
-    def clean(self, partial=False):
-        if partial:
-            # Discard only stale data
-            self.stale = self.fresh
-            self.fresh = {}
-            return
-
-        # Full clean
-        self.stale = {}
-        self.fresh = {}
-
-    def set(self, key, value):
-        self.fresh[key] = value
-        if len(self.fresh) > self.size:
-            self.clean(partial=True)
-
-QUERY_CACHE = LRU()
-register('load', QUERY_CACHE.clean)
+@menger_app.record
+def init_cache(state):
+    global fs_cache
+    app = state.app
+    cache_dir = app.config.get('MENGER_CACHE_DIR')
+    max_cache = app.config.get('MENGER_MAX_CACHE')
+    if cache_dir:
+        fs_cache = FSCache(cache_dir, max_cache)
+        register('clear_cache', fs_cache.reset)
 
 
 # TODO ext should be ony json|xlsx (not text)
@@ -62,7 +38,7 @@ def mng(method, ext):
     if get_permission:
         filters = get_permission()
     else:
-        filters = None
+        filters = []
 
     if method == 'info':
         spaces = []
@@ -84,24 +60,50 @@ def mng(method, ext):
 
         return json.jsonify(spaces=spaces)
 
+    query = expand_query(method)
+    spc_name = query.get('space')
+
+    # Not cached to avoid trashing other queries
+    if method == 'search':
+        with connect(current_app.config['MENGER_DATABASE']):
+            spc = get_space(spc_name)
+            if not spc:
+                return ('space "%s" not found' % spc_name, 404)
+
+            name = query.get('dimension')
+            if not hasattr(spc, name):
+                return ('space "%s" has not dimension %s' % (spc_name, name),
+                            404)
+            dim = getattr(spc, name)
+            res = list(dim.search(query['value']))
+            return json.jsonify(data=res)
+
+
     # Build unique id for query
-    h = md5(request.url.encode())
+    query_string = json.dumps(sorted(query.items()))
+    h = md5(json.dumps(query_string).encode())
     if filters:
-        filters_str = str(sorted(filters.items())).encode()
+        filters_str = str(sorted(filters)).encode()
         h.update(filters_str)
     qid = h.hexdigest()
 
-    cached_value = QUERY_CACHE.get(qid)
+    # Return cached value if any
+    cached_value = fs_cache.get(qid)
     if cached_value is not None:
-        return cached_value
-
-    raw_query = request.args.get('query', '{}')
-    query = json.loads(raw_query)
+        resp = current_app.response_class(
+            mimetype='application/json',
+        )
+        accept_encoding = request.headers.get('Accept-Encoding', '')
+        if 'gzip' not in accept_encoding.lower():
+            resp.set_data(gzip.decompress(cached_value))
+        else:
+            resp.headers['Content-Encoding'] = 'gzip'
+            resp.set_data(cached_value)
+        return resp
 
     res = {}
     if method == 'drill':
         with connect(current_app.config['MENGER_DATABASE']):
-            spc_name = query.get('space')
             spc = get_space(spc_name)
             if not spc:
                 return ('space "%s" not found' % spc_name, 404)
@@ -113,23 +115,34 @@ def mng(method, ext):
             dim = getattr(spc, name)
             value = tuple(query.get('value', []))
             data = list(dim.drill(value))
+            data.extend(dim.aliases(value))
             offset = len(value)
             mk_label = lambda x: dim.format(value + (x,), fmt_type='txt',
                                             offset=offset)
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
-        try:
-            res = do_dice(query, filters, ext)
-        except LimitException as e:
-            return json.jsonify(error='Request too big (%s)'% str(e))
+        with connect(current_app.config['MENGER_DATABASE']):
+            # Add user filters to the permission one
+            query_filters = query.get('filters', [])
+            measures = query['measures']
+            spc_name = measures[0].split('.')[0]
+            spc = get_space(spc_name)
+            for dim_name, filter_val, depth in query_filters:
+                dim = getattr(spc, dim_name)
+                coord = (None,) * (depth-1) + (filter_val,)
+                filters.append((dim_name, list(dim.glob(coord))))
+            try:
+                res = do_dice(query, filters, ext)
+            except LimitException as e:
+                return json.jsonify(error='Request too big (%s)'% str(e))
 
-        if ext == 'xlsx':
-            output_file = build_xlsx(res)
-            attachment_filename = compute_filename(
-                current_app.config['MENGER_EXPORT_PATTERN'])
-            return send_file(output_file, as_attachment=True,
-                     attachment_filename=attachment_filename)
+            if ext == 'xlsx':
+                output_file = build_xlsx(res)
+                attachment_filename = compute_filename(
+                    current_app.config['MENGER_EXPORT_PATTERN'])
+                return send_file(output_file, as_attachment=True,
+                         attachment_filename=attachment_filename)
 
     else:
         return ('Unknown method "%s"' % method, 404)
@@ -137,9 +150,44 @@ def mng(method, ext):
     if ext not in ('json', 'txt'):
         return 'Unknown extension "%s"' % ext, 404
 
-    json_res = json.jsonify(**res)
-    QUERY_CACHE.set(qid, json_res)
-    return json_res
+
+    # Cache result
+    json_res = json.dumps(res)
+    zipped_res = gzip.compress(json_res.encode())
+    fs_cache.set(qid, zipped_res)
+
+    # Return response
+    resp = current_app.response_class(
+            mimetype='application/json',
+        )
+    accept_encoding = request.headers.get('Accept-Encoding', '')
+    if 'gzip' not in accept_encoding.lower():
+        resp.set_data(json_res)
+    else:
+        resp.headers['Content-Encoding'] = 'gzip'
+        resp.set_data(zipped_res)
+    return resp
+
+
+def expand_query(method):
+    raw_query = request.args.get('query', '{}')
+    query = json.loads(raw_query)
+
+    if method == 'dice':
+        measures = query['measures']
+        spc_name = measures[0].split('.')[0]
+        spc = get_space(spc_name)
+        dimensions = query.get('dimensions', [])
+        for pos, (name, values) in enumerate(dimensions):
+            dim = getattr(spc, name)
+            dimensions[pos][1] = dim.expand(values)
+
+    elif method == 'drill':
+        spc = get_space(query['space'])
+        dim = getattr(spc, query['dimension'])
+        query['value'] = dim.expand(query['value'])
+
+    return query
 
 
 @menger_app.route('/')
@@ -160,14 +208,14 @@ def do_dice(query, filters, ext, limit=None):
 
     skip_zero = query.get('skip_zero')
     pivot_on = query.get('pivot_on')
-    with connect(current_app.config['MENGER_DATABASE']):
-        return dice(dimensions, measures,
-                    format_type=ext,
-                    filters=filters,
-                    skip_zero=skip_zero,
-                    pivot_on=pivot_on,
-                    limit=limit,
-        )
+
+    return dice(dimensions, measures,
+                format_type=ext,
+                filters=filters,
+                skip_zero=skip_zero,
+                pivot_on=pivot_on,
+                limit=limit,
+            )
 
 def compute_filename(pattern):
     now = datetime.datetime.now()

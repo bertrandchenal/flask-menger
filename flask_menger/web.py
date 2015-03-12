@@ -93,7 +93,8 @@ def get_measure(name):
     return msr
 
 
-def build_line(dimensions, key, coordinates, to_patch, all_coordinates, fmt_type=None):
+def build_line(dimensions, key, coordinates, to_patch, all_coordinates,
+               fmt_type=None):
     if fmt_type == 'json':
         line = []
         for dim, values, coord in zip(dimensions, key, coordinates):
@@ -174,7 +175,6 @@ def build_headers(spc, reg_coords, to_patch, all_coordinates):
 
 
 def dice(coordinates, measures, **options):
-
     format_type = options.get('format_type')
     filters = options.get('filters')
     skip_zero = options.get('skip_zero')
@@ -191,21 +191,6 @@ def dice(coordinates, measures, **options):
     if not spc:
         raise Exception('Space %s not found' % spc_name)
 
-    # If a same dimension is present several times, mask the deepest
-    # with the shallowest
-    for i, (idim, ivals) in enumerate(coordinates):
-        for j, (jdim, jvals) in enumerate(coordinates):
-            if idim != jdim:
-                continue
-            if len(jvals) >= len(ivals):
-                continue
-            tail = ivals[len(jvals):]
-            head = tuple(None if v is None else ivals[pos] \
-                     for pos, v in enumerate(jvals))
-            ivals = head + tail
-
-            coordinates[i] = (idim, ivals)
-
     # Split coordinates into regular and pivot coordinates
     reg_coords = [c for i, c in enumerate(coordinates) if i not in pivot_on]
     piv_coords = [coordinates[i] for i in pivot_on]
@@ -215,11 +200,14 @@ def dice(coordinates, measures, **options):
     dimensions = [get_dimension(spc, d) for d, v in coordinates]
 
     # Query DB
-    drills = [list(get_dimension(spc, d).glob(v)) for d, v in coordinates]
+    dim_filters = lambda name: [v for d,v in filters if d == name]
+    drills = [sorted(get_dimension(spc, d).glob(v, dim_filters(d))) \
+              for d, v in coordinates]
     data_dict = dice_by_msr(coordinates, measures, filters=filters, limit=limit)
 
-    # Apply mask on drill values if the same dimension appear several
-    # times
+    # Collapsing phase, we remove some combinations that makes no
+    # sense: Apply mask on drill values if the same dimension appear
+    # several times
     to_patch = {}
     for i, (idim, ivals) in enumerate(coordinates):
         for j, (jdim, jvals) in enumerate(coordinates):
