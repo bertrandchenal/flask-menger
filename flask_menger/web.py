@@ -249,11 +249,17 @@ def dice(coordinates, measures, **options):
                 'parent':  '|'.join(dim_names),
             })
 
-    # Fill data
+
+    # Prepare data and measure
     data = []
     measures = [get_measure(m) for m in measures]
-    totals = None
 
+    # Prepare aggregations and prime them
+    aggregators = [m.aggregator() for m in measures]
+    for agg in aggregators:
+        next(agg)
+
+    # Fill data
     for reg_key in product(*reg_drills):
         line = build_line(reg_dims, reg_key, reg_coords,
                           to_patch, coordinates,
@@ -268,18 +274,18 @@ def dice(coordinates, measures, **options):
         if skip_zero and not any(values):
             continue
 
+        # Increment aggregators
+        for agg, v in zip(aggregators, values):
+            agg.send(v)
+
         line.extend(m.format(v, fmt_type=format_type) \
                     for m, v in zip(cycle(measures), values))
         data.append(line)
 
-        # Aggregate totals
-        if totals is None:
-            totals = values
-        else:
-            for pos, v in enumerate(values):
-                totals[pos] += v
 
     # Add total line
+    totals = [agg.send(None) for agg in aggregators]
+
     if len(data) > 1:
         total_line = [''] * len(reg_cols)
         total_line.extend(m.format(v, fmt_type=format_type) \
