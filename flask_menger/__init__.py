@@ -36,7 +36,7 @@ def init_cache(state):
 def mng(method, ext):
     get_permission = current_app.config.get('MENGER_FILTER')
     if get_permission:
-        filters = list(get_permission().items())
+        filters = get_permission()
     else:
         filters = []
 
