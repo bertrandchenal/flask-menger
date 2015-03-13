@@ -186,7 +186,7 @@
       <div data-bind="if:card() == 'main'">
         <div class="list-group menu-list" data-bind="foreach: choice()">
           <li class="list-group-item menu-item"
-              data-bind="css: {active: $data === $parent}">
+              data-bind="css: {active: active}">
             <a href="#"
                data-bind="text: label,
                           click: select">

@@ -25,10 +25,14 @@ var Space = function(name, label, msr_sel) {
     this.label = label;
     this.msr_sel = msr_sel;
     this.measures = [];
+    this.active = ko.computed(function() {
+        return this.msr_sel && this.msr_sel.selected_spc() === this;
+    }.bind(this))
 };
 
 Space.prototype.select = function() {
     this.msr_sel.selected_spc(this);
+    this.measures[0].select();
     this.msr_sel.on_top(false);
 };
 
@@ -48,6 +52,9 @@ var Measure = function(space, name, label, msr_sel) {
     this.name = name;
     this.label = label;
     this.msr_sel = msr_sel;
+    this.active = ko.computed(function() {
+        return this.msr_sel && this.msr_sel.selected_msr() === this;
+    }.bind(this))
 };
 
 Measure.prototype.select = function() {
