@@ -461,10 +461,14 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
             return;
         }
 
+        var dim = this.selected_dim();
+        var max_depth = dim.get_value().length;
+
         var query = {
             'space': this.dataset.msr_selects()[0].selected_spc().name,
             'dimension': this.selected_dim().name,
             'value': cs,
+            'max_depth': max_depth,
         }
         query = JSON.stringify(query);
 

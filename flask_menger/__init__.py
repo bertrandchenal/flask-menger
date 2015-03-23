@@ -75,7 +75,7 @@ def mng(method, ext):
                 return ('space "%s" has not dimension %s' % (spc_name, name),
                             404)
             dim = getattr(spc, name)
-            res = list(dim.search(query['value']))
+            res = list(dim.search(query['value'], int(query['max_depth'])))
             return json.jsonify(data=res)
 
 
