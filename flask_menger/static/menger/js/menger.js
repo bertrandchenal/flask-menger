@@ -466,7 +466,7 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
         }
 
         var dim = this.selected_dim();
-        var max_depth = dim.get_value().length;
+        var max_depth = dim.levels().length;
 
         var query = {
             'space': this.dataset.msr_selects()[0].selected_spc().name,
