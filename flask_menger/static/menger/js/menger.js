@@ -72,8 +72,12 @@ var MsrSelect = function(dataset, spc_name, msr_name) {
     this.selected_spc = ko.observable();
     this.selected_msr = ko.observable();
     this.on_top = ko.observable(false);
+    this.card = ko.observable('main'); // one of ['option' | 'main']
+
     this.set_measure(dataset.available_spaces(), spc_name, msr_name);
-    this.card = ko.observable('main'); // can be 'option'
+    this.selected_spc.subscribe(function() {
+        this.dataset.msr_space_changed();
+    }.bind(this));
 };
 
 MsrSelect.prototype.set_measure = function(available_spaces, spc_name, msr_name) {
@@ -686,7 +690,7 @@ var DataSet = function(json_state) {
         this.set_state(json_state);
     }.bind(this));
 
-    this.msr_selects.subscribe(this.msr_selects_changed.bind(this));
+    this.msr_selects.subscribe(this.msr_space_changed.bind(this));
 
     // compute state
     ko.computed(this.refresh_state.bind(this)).extend({
@@ -855,7 +859,7 @@ DataSet.prototype.get_dim_selects = function(dims, filters) {
     }.bind(this));
 };
 
-DataSet.prototype.msr_selects_changed = function() {
+DataSet.prototype.msr_space_changed = function() {
     var sels = this.msr_selects();
     if (!sels.length) {
         return;
