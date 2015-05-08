@@ -65,7 +65,7 @@ def mng(method, ext):
 
     # Not cached to avoid trashing other queries
     if method == 'search':
-        with connect(current_app.config['MENGER_DATABASE']):
+        with connect(current_app.config['MENGER_DATABASE'], readonly=True):
             spc = get_space(spc_name)
             if not spc:
                 return ('space "%s" not found' % spc_name, 404)
@@ -103,7 +103,7 @@ def mng(method, ext):
 
     res = {}
     if method == 'drill':
-        with connect(current_app.config['MENGER_DATABASE']):
+        with connect(current_app.config['MENGER_DATABASE'], readonly=True):
             spc = get_space(spc_name)
             if not spc:
                 return ('space "%s" not found' % spc_name, 404)
@@ -122,7 +122,7 @@ def mng(method, ext):
             res['data'] = [(d, mk_label(d)) for d in data]
 
     elif method == 'dice':
-        with connect(current_app.config['MENGER_DATABASE']):
+        with connect(current_app.config['MENGER_DATABASE'], readonly=True):
             # Add user filters to the permission one
             query_filters = query.get('filters', [])
             measures = query['measures']
