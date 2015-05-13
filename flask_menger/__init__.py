@@ -35,20 +35,30 @@ def init_cache(state):
 @login_required
 def mng(method, ext):
     get_permission = current_app.config.get('MENGER_FILTER')
+    filters = []
+    msr_perm = {}
     if get_permission:
-        filters = get_permission()
-    else:
-        filters = []
+        perms = get_permission()
+        filters = perms.get('drill', [])
+        msr_perm = perms.get('measure', {})
 
     if method == 'info':
         spaces = []
         for space in iter_spaces():
-            space_info = {
-                'name': space._name,
-                'measures': [{
+            if space._name in msr_perm:
+                mp = msr_perm[space._name]
+                msr_info = [{
                     'name': m.name,
                     'label': m.label,
-                } for m in space._measures],
+                } for m in space._measures if m.name in mp]
+            else:
+                msr_info = [{
+                    'name': m.name,
+                    'label': m.label,
+                } for m in space._measures]
+            space_info = {
+                'name': space._name,
+                'measures': msr_info,
                 'dimensions': [{
                     'name': d.name,
                     'label': d.label,
