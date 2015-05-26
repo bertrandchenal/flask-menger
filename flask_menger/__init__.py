@@ -14,7 +14,11 @@ fs_cache = DummyCache()
 menger_app = Blueprint('menger', __name__,
                        template_folder='templates/menger',
                        static_folder='static/menger')
-
+def register(app):
+    app.register_blueprint(menger_app)
+    # Force a non-readonly query to let table creation proceed
+    with connect(app.config['MENGER_DATABASE'], readonly=False):
+        pass
 
 @menger_app.record
 def init_cache(state):
