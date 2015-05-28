@@ -50,8 +50,11 @@ class FSCache:
     def reset(self, clean=True):
         if not self.root:
             return
-        if clean and os.path.exists(self.root):
-            shutil.rmtree(self.root)
+        if clean:
+            try:
+                shutil.rmtree(self.root)
+            except FileNotFoundError:
+                pass
         try:
             os.mkdir(self.root)
         except OSError as e:
