@@ -18,7 +18,7 @@ class FSCache:
     def __init__(self, root, max_cache=None):
         self.root = root
         self.max_cache = max_cache or MAX_CACHE
-        self.reset(clean=True)
+        self.reset()
 
     def get(self, qid):
         if not self.root:
@@ -47,14 +47,11 @@ class FSCache:
             oldest = min(cached_files, key=os.path.getctime)
             os.unlink(oldest)
 
-    def reset(self, clean=False):
-        if not self.root:
-            return
-        if clean:
-            try:
-                shutil.rmtree(self.root)
-            except FileNotFoundError:
-                pass
+    def reset(self):
+        try:
+            shutil.rmtree(self.root)
+        except FileNotFoundError:
+            pass
         try:
             os.mkdir(self.root)
         except OSError as e:
