@@ -103,7 +103,7 @@ def mng(method, ext):
 
     # Return cached value if any
     cached_value = fs_cache.get(qid)
-    if cached_value is not None:
+    if ext == 'json' and cached_value is not None:
         resp = current_app.response_class(
             mimetype='application/json',
         )
