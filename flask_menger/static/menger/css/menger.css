@@ -11,6 +11,10 @@ li.menu-item.active a {
     overflow: auto;
 }
 
+.panel-title a {
+    color: inherit;
+}
+
 .panel-title a.glyphicon {
     text-decoration: none;
     color: lightgrey;
@@ -63,6 +67,11 @@ td.group, th.group {
 .list-group.menu-list {
     border-top: 1px solid #DDD;
     margin-bottom: 0;
+}
+
+.nopadding {
+   padding: 0 !important;
+   margin: 0 !important;
 }
 
 .svg-wrapper {

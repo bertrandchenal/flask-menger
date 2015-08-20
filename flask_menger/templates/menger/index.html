@@ -160,23 +160,25 @@
 <script type="text/html" id="measure_tpl">
   <div class="panel panel-default">
     <div class="panel-heading">
-      <h4 class="panel-title">
-        <span data-bind="if: !on_top()">
-          <a class="glyphicon glyphicon-chevron-left"
-             data-bind="click: drill_up"></a>
-        </span>
-        <a data-toggle="collapse" data-parent="#measures"
-           data-bind="attr: {href: '#collapse-measure-' + $index()},
-                      text: selected_spc().label">
-        </a>
-
-        <span class="pull-right">
+      <h4 class="panel-title row">
+        <div class="col-md-2">
+          <span data-bind="if: !on_top()">
+            <a class="glyphicon glyphicon-chevron-left"
+               data-bind="click: drill_up"></a>
+          </span>
+        </div>
+        <div class="col-md-7">
+          <a data-toggle="collapse" data-parent="#measures"
+             data-bind="attr: {href: '#collapse-measure-' + $index()},
+                        text: selected_spc().label">
+          </a>
+        </div>
+        <div class="col-md-3">
           <a class="glyphicon"
              data-bind="click: click_option, css: {active: card() == 'option'}">
             &#9776;
           </a>
-        </span>
-
+        </div>
       </h4>
     </div>
     <div class="panel-collapse collapse"
@@ -222,16 +224,20 @@
 <script type="text/html" id="dimension_tpl">
   <div class="panel panel-default"  style="overflow: visible">
     <div class="panel-heading">
-      <h4 class="panel-title">
-        <span data-bind="if: can_drill_up()">
-          <a class="glyphicon glyphicon-chevron-left"
-             data-bind="click: drill_up"></a>
-        </span>
-        <a data-toggle="collapse" data-parent="#dimensions"
-           data-bind="attr: {href: '#collapse-dimension-' + $index()},
-                      text: label">
-        </a>
-        <span class="pull-right">
+      <h4 class="panel-title row">
+        <div class="col-md-2">
+          <span data-bind="if: can_drill_up()">
+            <a class="glyphicon glyphicon-chevron-left"
+               data-bind="click: drill_up"></a>
+          </span>
+        </div>
+        <div class="col-md-7 nopadding">
+          <a data-toggle="collapse" data-parent="#dimensions"
+             data-bind="attr: {href: '#collapse-dimension-' + $index()},
+                        text: label">
+          </a>
+        </div>
+        <div class="col-md-3 nopadding">
           <a class="glyphicon glyphicon-search"
              style="padding-right:0.2em;"
              data-bind="click: click_search, css: {active: card() == 'search'}">
@@ -240,7 +246,6 @@
              data-bind="click: click_option, css: {active: card() == 'option'}">
             &#9776;
           </a>
-        </span>
       </h4>
     </div>
     <div class="panel-collapse collapse"
