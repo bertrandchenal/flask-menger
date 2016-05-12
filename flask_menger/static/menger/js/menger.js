@@ -511,6 +511,19 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
         }
     }.bind(this));
 
+    // Unset other pivots
+    this.pivot.subscribe(function(value) {
+        if (!value) {
+            return;
+        }
+        this.dataset.dim_selects().forEach(function(ds) {
+            if (ds !== this) {
+                ds.pivot(false);
+            }
+        }.bind(this));
+
+    }.bind(this));
+
 };
 
 DimSelect.prototype.set_dimensions = function(available, dim_name, dim_value) {
@@ -656,7 +669,7 @@ var DataSet = function(json_state) {
     this.table_data = ko.observable();
     this.graph_data = ko.observable();
     this.limit = ko.observable(PAGE_LENGTH);
-    this.columns = ko.observable([]);
+    this.headers = ko.observable([]);
     this.totals = ko.observable([]);
     this.json_state = ko.observable();
     this.state = {};
@@ -719,31 +732,53 @@ var DataSet = function(json_state) {
             this.limit(this.limit() + PAGE_LENGTH);
         }
     }.bind(this);
+};
 
-    this.columns_headers = ko.computed(function() {
-        // Collect parent title for all columns
-        var columns = this.columns();
-        var res = [];
-        var name_found = null;
-        for (var pos in columns) {
-            var name = columns[pos].parent;
-            name_found = name_found || (name && name.length);
-            if (res.length > 0 && name == res[res.length-1].name) {
-                res[res.length-1].colspan += 1;
-                continue;
+
+
+DataSet.prototype.format_headers = function(headers) {
+    var fmt_headers = [];
+    for (var row_pos in headers) {
+        var row = headers[row_pos];
+        var fmt_row = []
+        // First loop to compute colspan
+        for (var pos in row) {
+            var name = row[pos];
+            if (fmt_row.length > 0 && name == fmt_row[fmt_row.length  - 1].name) {
+                fmt_row[fmt_row.length - 1].colspan += 1;
+            } else {
+                fmt_row.push({
+                    'name': name, 'colspan': 1, 'type': 'group',
+                });
             }
-            res.push({
-                'name': name, 'colspan': 1, 'type': 'group',
-            });
         }
-
-        if (!name_found) {
-            // Avoid to display an empty line
-            return []
+        fmt_headers.push(fmt_row);
+        // Second loop to compute offset
+        for (var pos in fmt_row) {
+            var item = fmt_row[pos];
+            if (pos == 0) {
+                item.offset = 0;
+            } else {
+                var prev = fmt_row[pos - 1];
+                item.offset = prev.offset + prev.colspan;
+            }
         }
-        return res;
-    }.bind(this));
+    }
+    return fmt_headers;
+};
 
+DataSet.prototype.type = function(idx) {
+    var last_dim = this.dim_selects().length -1;
+    var has_pivot = false;
+    this.dim_selects().forEach(function(ds, pos) {
+        if (ds.pivot()) {
+            has_pivot = true;
+        }
+    });
+    if (has_pivot) {
+        last_dim -=1;
+    }
+    return idx <= last_dim ? 'dimension': 'measure';
 };
 
 DataSet.prototype.toggle_show_menu = function() {
@@ -846,7 +881,7 @@ DataSet.prototype.get_dim_selects = function(dims, filters) {
     var filter;
     return dims.map(function(d, pos) {
 
-        var pivot = pivot_on.indexOf(pos) > -1;
+        var pivot = pivot_on == pos;
         var filter_name = filters && filters.length && filters[0][0];
         if (filter_name && filter_name == d[0]) {
             filter = filters.shift(); // match found 'pop' it from the list
@@ -854,7 +889,6 @@ DataSet.prototype.get_dim_selects = function(dims, filters) {
         } else {
             filter = null;
         }
-
         return new DimSelect(this, d[0], d[1], pivot, filter);
     }.bind(this));
 };
@@ -990,12 +1024,12 @@ DataSet.prototype.refresh_state = function() {
         return;
     }
 
-    var pivot_on = [];
+    var pivot_on = null;
     dim_sels.forEach(function(ds, pos) {
         if (ds.pivot()) {
-            pivot_on.push(pos);
+            pivot_on = pos;
         }
-    })
+    });
 
     this.state = {
         'measures': msr_sels.map(function(m) {
@@ -1031,7 +1065,7 @@ DataSet.prototype.refresh_state = function() {
             this.cache_data(url, res);
             // Update dataset
             this.table_data(res.data);
-            this.columns(res.columns);
+            this.headers(this.format_headers(res.headers));
             this.totals(res.totals);
         }.bind(this));
     } else if (this.active_view() == 'graph') {
@@ -1132,7 +1166,6 @@ DataSet.prototype.refresh_state = function() {
         }.bind(this));
     }
 };
-
 
 
 DataSet.prototype.dice_url = function(ext) {

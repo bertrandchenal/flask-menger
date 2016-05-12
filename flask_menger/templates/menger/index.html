@@ -17,6 +17,17 @@
 <script src="{{url_for('menger.static', filename='js/menger.js')}}"></script>
 {% endblock %}
 
+{% block header %}
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <!-- Brand and toggle get grouped for better mobile display -->
+    <div class="navbar-header">
+      <a class="navbar-brand" href="#">Example Layout</a>
+    </div>
+  </div><!-- /.container-fluid -->
+</nav>
+{% endblock %}
+
 {% block container %}
 <div class="row">
   <div class="col-sm-3 left-menu" data-bind="visible: show_menu">
@@ -122,18 +133,15 @@
         <div class="tab-content" style="overflow-x: auto">
           <div class="tab-pane active" id="table">
             <table class="table table-hover">
-              <thead>
-                <tr data-bind="foreach: columns_headers">
-                  <th data-bind="text: name, attr: {'colspan': colspan}, css: type"></th>
-                </tr>
-                <tr data-bind="foreach: columns">
-                  <th data-bind="text: label, css: type"></th>
+              <thead data-bind="foreach: {data: headers, as: 'row'}">
+                <tr data-bind="foreach: row">
+                  <th data-bind="text: name, attr: {'colspan': colspan}, css: $root.type(offset)"></th>
                 </tr>
               </thead>
 
               <tbody data-bind="foreach: {data: get_data, as: 'line'}">
-                <tr data-bind="foreach: $parent.columns">
-                  <td data-bind="text: line[$index()], css: type"></td>
+                <tr data-bind="foreach: line">
+                  <td data-bind="text: line[$index()], css: $root.type($index())"></td>
                 </tr>
               </tbody>
 

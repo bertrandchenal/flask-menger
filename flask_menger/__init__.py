@@ -4,7 +4,6 @@ import gzip
 
 from flask import (current_app, Blueprint, render_template, request, json,
                    send_file)
-from flask.ext.login import login_required
 from menger import connect, get_space, iter_spaces, register
 
 from flask_menger.web import build_xlsx, dice, LimitException
@@ -36,7 +35,6 @@ def init_cache(state):
 # where type can be 'graph' or 'table'
 
 @menger_app.route('/mng/<method>.<ext>', methods=['GET', 'POST'])
-@login_required
 def mng(method, ext):
     get_permission = current_app.config.get('MENGER_FILTER')
     filters = []
@@ -66,7 +64,7 @@ def mng(method, ext):
                 'dimensions': [{
                     'name': d.name,
                     'label': d.label,
-                    'levels': d.levels,
+                    'levels': list(d.levels.keys()),
                 } for d in space._dimensions],
                 'label': space._label,
             }
@@ -154,7 +152,8 @@ def mng(method, ext):
             if ext == 'xlsx':
                 output_file = build_xlsx(res)
                 attachment_filename = compute_filename(
-                    current_app.config['MENGER_EXPORT_PATTERN'])
+                    current_app.config.get('MENGER_EXPORT_PATTERN',
+                    '%Y-%m%d'))
                 return send_file(output_file, as_attachment=True,
                          attachment_filename=attachment_filename)
 
@@ -163,7 +162,6 @@ def mng(method, ext):
 
     if ext not in ('json', 'txt'):
         return 'Unknown extension "%s"' % ext, 404
-
 
     # Cache result
     json_res = json.dumps(res)
@@ -187,16 +185,7 @@ def expand_query(method):
     raw_query = request.args.get('query', '{}')
     query = json.loads(raw_query)
 
-    if method == 'dice':
-        measures = query['measures']
-        spc_name = measures[0].split('.')[0]
-        spc = get_space(spc_name)
-        dimensions = query.get('dimensions', [])
-        for pos, (name, values) in enumerate(dimensions):
-            dim = getattr(spc, name)
-            dimensions[pos][1] = dim.expand(values)
-
-    elif method == 'drill':
+    if method == 'drill':
         spc = get_space(query['space'])
         dim = getattr(spc, query['dimension'])
         query['value'] = dim.expand(query['value'])
@@ -205,7 +194,6 @@ def expand_query(method):
 
 
 @menger_app.route('/')
-@login_required
 def home():
     return render_template("index.html")
 
@@ -213,9 +201,6 @@ def home():
 def do_dice(query, filters, ext, limit=None):
     res = {}
     dimensions = query.get('dimensions', [])
-    for d in dimensions:
-        d[1] = tuple(d[1] or [])
-
     measures = query.get('measures')
     if not measures:
         return ('Key "measures" is empty', 404)
