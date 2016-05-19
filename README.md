@@ -1,7 +1,7 @@
 
 # Flask-Menger
 
-Flask-Menger is a blueprint that provides a web-ui for the Menger
+Flask-Menger is a blueprint that provides a web UI for the Menger
 OLAP library.
 
 
