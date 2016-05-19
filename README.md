@@ -31,3 +31,10 @@ If you run the above code and open `localhost:5000` in your browser
 (and if `my_database.db` is populated) you should see something like:
 
 ![Screenshot](screenshot.png)
+
+
+## Roadmap
+
+  - Graph support is still in alpha quality, buggy and missing features
+  - Add support for more advanced filters, limit and sorting.
+  - More compact layout ?
