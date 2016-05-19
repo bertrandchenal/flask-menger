@@ -1,7 +1,7 @@
 
 # Flask-Menger
 
-Flask-Menger is a blueprint that provides a web-ui on for the Menger
+Flask-Menger is a blueprint that provides a web-ui for the Menger
 OLAP library.
 
 
@@ -12,7 +12,7 @@ OLAP library.
     from menger import dimension, Space, measure
     import flask_menger
 
-
+    # Define space, dimensions and measure
     class Population(Space):
         geography = dimension.Tree('Geography', [
             ('region', 'Region'),
@@ -21,11 +21,14 @@ OLAP library.
         year = dimension.Tree('Year', [('year', 'Year')], int)
         population = measure.Sum('Population', int)
 
-
+    # Register blueprint and launch flask
     app = Flask(__name__)
     app.register_blueprint(flask_menger.menger_app)
     app.config['MENGER_DATABASE'] = my_database.db'
     app.run(debug=True)
+
+
+## Result
 
 If you run the above code and open `localhost:5000` in your browser
 (and if `my_database.db` is populated) you should see something like:
