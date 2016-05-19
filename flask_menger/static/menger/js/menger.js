@@ -209,7 +209,7 @@ Coordinate.prototype.drill = function(value) {
         return $.when();
     }
 
-    var url = '/mng/drill.json?' + $.param({'query': query});
+    var url = 'mng/drill.json?' + $.param({'query': query});
     var prm = $.ajax(url)
     prm.then(function(res) {
         DRILL_CACHE[query] = res;
@@ -476,7 +476,7 @@ var DimSelect = function(dataset, dim_name, dim_value, pivot, filter) {
         }
         query = JSON.stringify(query);
 
-        var url = '/mng/search.json?' +  $.param({'query': query});
+        var url = 'mng/search.json?' +  $.param({'query': query});
         $.get(url).then(function(resp) {
             var results = []
             for (var pos in resp.data) {
@@ -698,7 +698,7 @@ var DataSet = function(json_state) {
 
 
     // fetch meta-data and init state
-    $.get('/mng/info.json').then(function(info) {
+    $.get('mng/info.json').then(function(info) {
         this.set_info(info);
         this.set_state(json_state);
     }.bind(this));
@@ -1176,7 +1176,7 @@ DataSet.prototype.dice_url = function(ext) {
         state.skip_zero = false;
         json_state = JSON.stringify(state);
     }
-    return '/mng/dice.' + ext + '?' +  $.param({'query': json_state});
+    return 'mng/dice.' + ext + '?' +  $.param({'query': json_state});
 }
 
 
