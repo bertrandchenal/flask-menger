@@ -24,7 +24,7 @@ OLAP library.
     # Register blueprint and launch flask
     app = Flask(__name__)
     app.register_blueprint(flask_menger.menger_app)
-    app.config['MENGER_DATABASE'] = my_database.db'
+    app.config['MENGER_DATABASE'] = 'my_database.db'
     app.run(debug=True)
 
 
