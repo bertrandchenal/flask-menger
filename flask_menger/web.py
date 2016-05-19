@@ -33,7 +33,7 @@ def dice(coordinates, measures, **options):
         'format': 'leaf',
         'filters': filters,
     }
-    options.pop('filters', []) # TODO!
+
     query.update(options)
     res = gasket.dice(query)
     data = [list(row) for row in res['data'].values]
