@@ -768,15 +768,15 @@ DataSet.prototype.format_headers = function(headers) {
 };
 
 DataSet.prototype.type = function(idx) {
-    var last_dim = this.dim_selects().length -1;
+    var last_dim = this.dim_selects().length - 1;
     var has_pivot = false;
     this.dim_selects().forEach(function(ds, pos) {
         if (ds.pivot()) {
             has_pivot = true;
         }
     });
-    if (has_pivot) {
-        last_dim -=1;
+    if (has_pivot && last_dim > 1) {
+        last_dim -= 1;
     }
     return idx <= last_dim ? 'dimension': 'measure';
 };
