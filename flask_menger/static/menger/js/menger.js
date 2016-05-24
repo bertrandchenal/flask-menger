@@ -1047,7 +1047,7 @@ DataSet.prototype.refresh_state = function() {
     }
     this.json_state(JSON.stringify(this.state));
 
-    var hash = '#' + btoa(this.json_state());
+    var hash = '#' + utoa(this.json_state());
     if (window.location.hash != hash) {
         window.history.pushState(this.json_state(), "Title", hash);
     }
@@ -1271,13 +1271,21 @@ CHARTS.pie = {
 
 var get_state = function() {
     try {
-        var json_string = atob(window.location.hash.slice(1));
+        var json_string = atou(window.location.hash.slice(1));
         return JSON.parse(json_string);
     } catch(e) {
         return null;
     }
 }
 
+// Safe b64 conversion
+// source: https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/btoa#Unicode_Strings
+function utoa(str) {
+    return window.btoa(unescape(encodeURIComponent(str)));
+}
+function atou(str) {
+    return decodeURIComponent(escape(window.atob(str)));
+}
 
 var init = function() {
     var json_state = get_state();
