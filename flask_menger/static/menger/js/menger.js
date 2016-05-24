@@ -774,9 +774,10 @@ DataSet.prototype.type = function(idx) {
             has_pivot = true;
         }
     });
-    if (has_pivot && last_dim > 1) {
+    if (has_pivot && last_dim >= 1) {
         last_dim -= 1;
     }
+
     return idx <= last_dim ? 'dimension': 'measure';
 };
 
