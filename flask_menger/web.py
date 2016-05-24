@@ -27,14 +27,15 @@ def dice(coordinates, measures, **options):
             name,
             [tuple(takewhile(lambda x: x is not None, vals))]
         ))
-
     query = {
         'select': select,
         'format': 'leaf',
-        'filters': filters,
+        'filters': filters + options.get('filters', []),
+        'skip_zero': options.get('skip_zero'),
+        'limit': options.get('limit'),
+        'pivot_on': options.get('pivot_on'),
     }
 
-    query.update(options)
     res = gasket.dice(query)
     data = [list(row) for row in res['data'].values]
     for pos, line in enumerate(data):
