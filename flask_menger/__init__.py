@@ -93,7 +93,7 @@ def mng(method, ext):
 
     # Build unique id for query
     query_string = json.dumps(sorted(query.items()))
-    h = md5(json.dumps(query_string).encode())
+    h = md5(json.dumps(query_string).encode() + ext.encode())
     if filters:
         filters_str = str(sorted(filters)).encode()
         h.update(filters_str)
