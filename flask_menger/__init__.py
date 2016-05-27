@@ -207,6 +207,7 @@ def do_dice(query, filters, ext, limit=None):
 
     skip_zero = query.get('skip_zero')
     pivot_on = query.get('pivot_on')
+    sort_by = query.get('sort_by')
 
     return dice(dimensions, measures,
                 format_type=ext,
@@ -214,6 +215,7 @@ def do_dice(query, filters, ext, limit=None):
                 skip_zero=skip_zero,
                 pivot_on=pivot_on,
                 limit=limit,
+                sort_by=sort_by
             )
 
 def compute_filename(pattern):

@@ -34,6 +34,7 @@ def dice(coordinates, measures, **options):
         'skip_zero': options.get('skip_zero'),
         'limit': options.get('limit'),
         'pivot_on': options.get('pivot_on'),
+        'sort_by': options.get('sort_by'),
     }
 
     res = gasket.dice(query)

@@ -674,6 +674,8 @@ var DataSet = function(json_state) {
     this.state = {};
     this.ready = ko.observable(false);
     this.skip_zero = ko.observable(true);
+    this.sort_pos = ko.observable();
+    this.sort_dir = ko.observable();
     this.show_menu = ko.observable(true);
     this.active_view = ko.observable('table');
     this.chart_type = ko.observable('table');
@@ -739,6 +741,7 @@ DataSet.prototype.format_headers = function(headers) {
     var fmt_headers = [];
     for (var row_pos in headers) {
         var row = headers[row_pos];
+        var last_row = row_pos == headers.length - 1
         var fmt_row = []
         // First loop to compute colspan
         for (var pos in row) {
@@ -753,8 +756,11 @@ DataSet.prototype.format_headers = function(headers) {
         }
         fmt_headers.push(fmt_row);
         // Second loop to compute offset
+        var sort_pos = this.sort_pos()
         for (var pos in fmt_row) {
             var item = fmt_row[pos];
+            item.sorted = sort_pos == pos && last_row;
+
             if (pos == 0) {
                 item.offset = 0;
             } else {
@@ -766,7 +772,18 @@ DataSet.prototype.format_headers = function(headers) {
     return fmt_headers;
 };
 
-DataSet.prototype.type = function(idx) {
+DataSet.prototype.change_sort = function(header) {
+    var sort_pos = this.sort_pos();
+    var direction = this.sort_dir();
+    if (header.offset === sort_pos) {
+        direction = direction === 'asc' ? 'desc' : 'asc'
+    }
+
+    this.sort_pos(header.offset);
+    this.sort_dir(direction);
+};
+
+DataSet.prototype.is_msr = function(idx) {
     var last_dim = this.dim_selects().length - 1;
     var has_pivot = false;
     this.dim_selects().forEach(function(ds, pos) {
@@ -777,8 +794,7 @@ DataSet.prototype.type = function(idx) {
     if (has_pivot && last_dim >= 1) {
         last_dim -= 1;
     }
-
-    return idx <= last_dim ? 'dimension': 'measure';
+    return idx > last_dim;
 };
 
 DataSet.prototype.toggle_show_menu = function() {
@@ -1007,6 +1023,13 @@ DataSet.prototype.set_state = function(state) {
     this.ready(false);
     var sz = state.skip_zero === undefined || state.skip_zero;
     this.skip_zero(sz);
+
+    if (state.sort_by) {
+        var sort_pos = state.sort_by[0];
+        var sort_dir = state.sort_by[1];
+        this.sort_pos(sort_pos);
+        this.sort_dir(sort_dir);
+    }
     this.state = state || {};
     // Reset data
     this.dim_selects([]);
@@ -1031,6 +1054,12 @@ DataSet.prototype.refresh_state = function() {
         }
     });
 
+    var sort_by = null;
+    if (this.sort_pos() !== undefined &&  this.sort_dir() !== undefined) {
+        sort_by = [this.sort_pos(), this.sort_dir()];
+        console.log(sort_by);
+    }
+
     this.state = {
         'measures': msr_sels.map(function(m) {
             return m.full_name();
@@ -1042,6 +1071,7 @@ DataSet.prototype.refresh_state = function() {
         }),
         'skip_zero': this.skip_zero(),
         'pivot_on': pivot_on,
+        'sort_by': sort_by,
         'filters': dim_sels.map(function(dsel) {
             return dsel.get_filter_item();
         }).filter(identity),
@@ -1174,6 +1204,7 @@ DataSet.prototype.dice_url = function(ext) {
     if (this.active_view() == 'graph') {
         var state = JSON.parse(json_state)
         state.skip_zero = false;
+        state.pivot_on = null;
         json_state = JSON.stringify(state);
     }
     return 'mng/dice.' + ext + '?' +  $.param({'query': json_state});

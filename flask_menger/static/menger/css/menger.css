@@ -26,6 +26,9 @@ li.menu-item.active a {
     cursor: pointer;
 }
 
+.sorted {
+    text-decoration: underline;
+}
 
 td.measure, th.measure {
     text-align: right;
@@ -34,6 +37,10 @@ td.measure, th.measure {
 td.group, th.group {
     text-align: center;
     border-right: 8px solid white;
+}
+
+th:hover {
+    cursor: pointer;
 }
 
 .totals td {
