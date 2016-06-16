@@ -746,7 +746,7 @@ DataSet.prototype.format_headers = function(headers) {
         // First loop to compute colspan
         for (var pos in row) {
             var name = row[pos];
-            if (fmt_row.length > 0 && name == fmt_row[fmt_row.length  - 1].name) {
+            if (fmt_row.length > 0 && name === fmt_row[fmt_row.length  - 1].name) {
                 fmt_row[fmt_row.length - 1].colspan += 1;
             } else {
                 fmt_row.push({
