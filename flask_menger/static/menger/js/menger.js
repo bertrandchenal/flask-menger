@@ -893,11 +893,11 @@ DataSet.prototype.set_info = function(info) {
 };
 
 DataSet.prototype.get_dim_selects = function(dims, filters) {
-    var pivot_on = this.state.pivot_on || [];
+    var pivot_on = this.state.hasOwnProperty('pivot_on') ? this.state.pivot_on : null;
     var filter;
     return dims.map(function(d, pos) {
 
-        var pivot = pivot_on == pos;
+        var pivot = (pivot_on !== null) && (pivot_on == pos);
         var filter_name = filters && filters.length && filters[0][0];
         if (filter_name && filter_name == d[0]) {
             filter = filters.shift(); // match found 'pop' it from the list
@@ -1057,7 +1057,6 @@ DataSet.prototype.refresh_state = function() {
     var sort_by = null;
     if (this.sort_pos() !== undefined &&  this.sort_dir() !== undefined) {
         sort_by = [this.sort_pos(), this.sort_dir()];
-        console.log(sort_by);
     }
 
     this.state = {
