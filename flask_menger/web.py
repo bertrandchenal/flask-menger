@@ -42,11 +42,10 @@ def dice(coordinates, measures, **options):
     for pos, line in enumerate(data):
         line = [int(x) if isinstance(x, numpy.int64) else x for x in line]
         data[pos] = line
-
     return {
         'data': data,
         'headers': res['headers'],
-        'totals': None,
+        'totals': res['totals'],
     }
 
 
