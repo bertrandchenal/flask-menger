@@ -1108,15 +1108,7 @@ DataSet.prototype.refresh_state = function() {
             var graph_max_dim = chart_class.graph_max_dim;
 
             // Count dimensions
-            var nb_dim = 0;
-            for (var pos in dim_sels) {
-                var dim = dim_sels[pos].selected_dim();
-                // Frozen dimensions are not included in results
-                // TODO s/active/frozen/ -> on coordinate object
-                if (dim.get_value().indexOf(null) >= 0) {
-                    nb_dim++;
-                }
-            }
+            var nb_dim = dim_sels.length;
 
             // Show error if dimension number mismatch
             var vis = $("#vis");
@@ -1140,7 +1132,6 @@ DataSet.prototype.refresh_state = function() {
                 this.show_menu.subscribe(function() {chart.update()});
                 return chart;
             }.bind(this);
-
 
             // Nest on extra dimensions
             var nest = d3.nest();
