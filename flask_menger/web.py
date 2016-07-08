@@ -32,6 +32,7 @@ def dice(coordinates, measures, **options):
         'format': 'leaf',
         'filters': filters + options.get('filters', []),
         'skip_zero': options.get('skip_zero'),
+        'msr_fmt': options.get('msr_fmt'),
         'limit': options.get('limit'),
         'pivot_on': options.get('pivot_on'),
         'sort_by': options.get('sort_by'),

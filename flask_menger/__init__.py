@@ -206,6 +206,7 @@ def do_dice(query, filters, ext, limit=None):
         return ('Key "measures" is empty', 404)
 
     skip_zero = query.get('skip_zero')
+    msr_fmt = query.get('msr_fmt')
     pivot_on = query.get('pivot_on')
     sort_by = query.get('sort_by')
 
@@ -213,6 +214,7 @@ def do_dice(query, filters, ext, limit=None):
                 format_type=ext,
                 filters=filters,
                 skip_zero=skip_zero,
+                msr_fmt=msr_fmt,
                 pivot_on=pivot_on,
                 limit=limit,
                 sort_by=sort_by

@@ -1190,13 +1190,16 @@ DataSet.prototype.refresh_state = function() {
 
 DataSet.prototype.dice_url = function(ext) {
     var json_state = this.json_state();
+    var state = JSON.parse(json_state)
     // enforce full output for graphs
     if (this.active_view() == 'graph') {
-        var state = JSON.parse(json_state)
         state.skip_zero = false;
+        state.msr_fmt = false;
         state.pivot_on = null;
-        json_state = JSON.stringify(state);
+    } else {
+        state.msr_fmt = 'auto';
     }
+    json_state = JSON.stringify(state);
     return 'mng/dice.' + ext + '?' +  $.param({'query': json_state});
 }
 
