@@ -1133,8 +1133,21 @@ DataSet.prototype.refresh_state = function() {
             // same instance)
             var get_chart = function() {
                 var chart = chart_class.chart();
+                // Add margin to make space for axis labels
+                chart.margin({
+                    'left': 80,
+                    'bottom': 80,
+                });
+                // Define data
                 chart.x(function(d) {return d[0]})
                     .y(function(d) {return d[nb_dim]});
+                // Define Axis labels
+                if (chart.xAxis) {
+                    chart.xAxis.axisLabel(res.headers[0][0]).axisLabelDistance(20);
+                }
+                if (chart.yAxis) {
+                    chart.yAxis.axisLabel(res.headers[0][nb_dim]);
+                }
 
                 this.show_menu.subscribe(function() {chart.update()});
                 return chart;
@@ -1176,7 +1189,6 @@ DataSet.prototype.refresh_state = function() {
                         .transition().duration(500)
                         .call(chart);
                 });
-
 
                 var label = wrapper.selectAll('p.label')
                     .data(function(d,i){return [d]});
