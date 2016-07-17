@@ -198,26 +198,21 @@ def home():
     return render_template("index.html")
 
 
-def do_dice(query, filters, ext, limit=None):
+def do_dice(query, filters, ext):
     res = {}
     dimensions = query.get('dimensions', [])
     measures = query.get('measures')
     if not measures:
         return ('Key "measures" is empty', 404)
 
-    skip_zero = query.get('skip_zero')
-    msr_fmt = query.get('msr_fmt')
-    pivot_on = query.get('pivot_on')
-    sort_by = query.get('sort_by')
-
     return dice(dimensions, measures,
                 format_type=ext,
                 filters=filters,
-                skip_zero=skip_zero,
-                msr_fmt=msr_fmt,
-                pivot_on=pivot_on,
-                limit=limit,
-                sort_by=sort_by
+                skip_zero=query.get('skip_zero'),
+                msr_fmt=query.get('msr_fmt'),
+                pivot_on=query.get('pivot_on'),
+                limit=query.get('limit'),
+                sort_by=query.get('sort_by'),
             )
 
 def compute_filename(pattern):
