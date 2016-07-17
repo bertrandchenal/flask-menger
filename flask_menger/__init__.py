@@ -205,13 +205,20 @@ def do_dice(query, filters, ext):
     if not measures:
         return ('Key "measures" is empty', 404)
 
+    limit = query.get('limit')
+    if limit is not None:
+        try:
+            limit = int(limit)
+        except ValueError:
+            limit = None
+
     return dice(dimensions, measures,
                 format_type=ext,
                 filters=filters,
                 skip_zero=query.get('skip_zero'),
                 msr_fmt=query.get('msr_fmt'),
                 pivot_on=query.get('pivot_on'),
-                limit=query.get('limit'),
+                limit=limit,
                 sort_by=query.get('sort_by'),
             )
 

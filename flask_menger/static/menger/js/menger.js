@@ -667,7 +667,7 @@ var DataSet = function(json_state) {
     this.available_dimensions = ko.observable([]);
     this.table_data = ko.observable();
     this.graph_data = ko.observable();
-    this.limit = ko.observable(PAGE_LENGTH);
+    this.page_limit = ko.observable(PAGE_LENGTH);
     this.headers = ko.observable([]);
     this.totals = ko.observable([]);
     this.json_state = ko.observable();
@@ -676,6 +676,7 @@ var DataSet = function(json_state) {
     this.skip_zero = ko.observable(true);
     this.sort_pos = ko.observable();
     this.sort_dir = ko.observable();
+    this.limit = ko.observable();
     this.show_menu = ko.observable(true);
     this.active_view = ko.observable('table');
     this.chart_type = ko.observable('table');
@@ -714,14 +715,14 @@ var DataSet = function(json_state) {
     // get_data returns slice of data that increase with this.limit()
     this.get_data = ko.computed(function() {
         var res = this.table_data();
-        if (res && res.length > this.limit()) {
-            return res.slice(0, this.limit());
+        if (res && res.length > this.page_limit()) {
+            return res.slice(0, this.page_limit());
         }
         return res;
     }, this);
 
     this.table_data.subscribe(function() {
-        this.limit(PAGE_LENGTH);
+        this.page_limit(PAGE_LENGTH);
     }, this);
 
 
@@ -729,8 +730,8 @@ var DataSet = function(json_state) {
         var full_height = document.body.offsetHeight;
         var position = window.innerHeight + window.scrollY;
         var near_bottom = position >= full_height * 0.9;
-        if (this.table_data() && near_bottom && this.table_data().length > this.limit()) {
-            this.limit(this.limit() + PAGE_LENGTH);
+        if (this.table_data() && near_bottom && this.table_data().length > this.page_limit()) {
+            this.page_limit(this.page_limit() + PAGE_LENGTH);
         }
     }.bind(this);
 };
@@ -1059,6 +1060,11 @@ DataSet.prototype.refresh_state = function() {
         sort_by = [this.sort_pos(), this.sort_dir()];
     }
 
+    var limit = this.limit();
+    if (limit) {
+        limit = parseInt(limit);
+    }
+
     this.state = {
         'measures': msr_sels.map(function(m) {
             return m.full_name();
@@ -1069,6 +1075,7 @@ DataSet.prototype.refresh_state = function() {
             return [dimension.name, value]
         }),
         'skip_zero': this.skip_zero(),
+        'limit': limit,
         'pivot_on': pivot_on,
         'sort_by': sort_by,
         'filters': dim_sels.map(function(dsel) {
